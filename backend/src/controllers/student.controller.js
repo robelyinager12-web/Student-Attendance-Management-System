@@ -1,3 +1,5 @@
+const { createNotification } = require('../services/notification.service');
+const { User: UserModel } = require('../models'); // already imported as User above, skip if duplicate
 const bcrypt = require('bcrypt');
 const { Op } = require('sequelize');
 const asyncHandler = require('../utils/asyncHandler');
@@ -48,6 +50,18 @@ const createStudent = asyncHandler(async (req, res) => {
   if (courseId) {
     await Enrollment.create({ studentId: student.id, courseId });
   }
+  // Notify all admins about the new student
+  const admins = await User.findAll({ where: { role: 'ADMIN' } });
+  await Promise.all(
+    admins.map((admin) =>
+      createNotification({
+        userId: admin.id,
+        title: 'New Student Added',
+        message: `${user.name} (${studentCode}) was just registered as a new student.`,
+        type: 'STUDENT',
+      })
+    )
+  );
 
   return success(res, 201, 'Student created successfully', {
     id: student.id,

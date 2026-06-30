@@ -80,7 +80,7 @@ async function resetPassword(token, newPassword) {
   await User.update({ password: hashedPassword }, { where: { id: resetEntry.userId } });
   await resetEntry.update({ used: true });
 
-  return true;
+  return resetEntry.userId;
 }
 
 module.exports = {

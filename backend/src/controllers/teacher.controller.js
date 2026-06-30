@@ -1,3 +1,4 @@
+const { createNotification } = require('../services/notification.service');
 const bcrypt = require('bcrypt');
 const asyncHandler = require('../utils/asyncHandler');
 const { success, error } = require('../utils/apiResponse');
@@ -38,6 +39,17 @@ const createTeacher = asyncHandler(async (req, res) => {
     qualification,
     experience,
   });
+ const admins = await User.findAll({ where: { role: 'ADMIN' } });
+  await Promise.all(
+    admins.map((admin) =>
+      createNotification({
+        userId: admin.id,
+        title: 'New Teacher Added',
+        message: `${user.name} (${teacherCode}) was just added as a new teacher.`,
+        type: 'TEACHER',
+      })
+    )
+  ); 
 
   return success(res, 201, 'Teacher created successfully', {
     id: teacher.id,

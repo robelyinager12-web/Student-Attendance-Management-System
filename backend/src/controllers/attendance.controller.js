@@ -1,4 +1,5 @@
 const { Op } = require('sequelize');
+const { checkLowAttendanceAndNotify } = require('../services/notification.service');
 const asyncHandler = require('../utils/asyncHandler');
 const { success, error } = require('../utils/apiResponse');
 const { Attendance, Student, User, Class, Course, Teacher } = require('../models');
@@ -15,10 +16,13 @@ const markAttendance = asyncHandler(async (req, res) => {
 
   let teacherId = await getTeacherIdFromUser(req.user.id);
   if (!teacherId && req.user.role === 'ADMIN') {
-    teacherId = classData.teacherId; // fallback when admin marks attendance directly
+    teacherId = classData.teacherId;
   }
 
   const attendance = await markSingleAttendance({ studentId, classId, courseId, date, status, remark, teacherId });
+
+  // Check attendance health in the background (don't block the response)
+  checkLowAttendanceAndNotify(studentId).catch((err) => console.error('Low attendance check failed:', err));
 
   return success(res, 201, 'Attendance marked successfully', attendance);
 });
@@ -46,6 +50,7 @@ const markBulkAttendance = asyncHandler(async (req, res) => {
       teacherId,
     });
     results.push(attendance);
+    checkLowAttendanceAndNotify(record.studentId).catch((err) => console.error('Low attendance check failed:', err));
   }
 
   return success(res, 201, 'Bulk attendance marked successfully', { count: results.length, records: results });

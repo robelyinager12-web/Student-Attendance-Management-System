@@ -1,3 +1,4 @@
+const { createNotification } = require('../services/notification.service');
 const asyncHandler = require('../utils/asyncHandler');
 const { success } = require('../utils/apiResponse');
 const { sendEmail } = require('../config/mailer.config');
@@ -81,7 +82,14 @@ const forgotPassword = asyncHandler(async (req, res) => {
 const resetPassword = asyncHandler(async (req, res) => {
   const { token, newPassword } = req.body;
 
-  await authService.resetPassword(token, newPassword);
+  const userId = await authService.resetPassword(token, newPassword);
+
+  await createNotification({
+    userId,
+    title: 'Password Reset',
+    message: 'Your password was successfully reset. If you did not do this, contact the administrator immediately.',
+    type: 'PASSWORD',
+  });
 
   return success(res, 200, 'Password reset successfully');
 });
