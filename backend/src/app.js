@@ -33,6 +33,11 @@ app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/departments', require('./routes/department.routes'));
 app.use('/api/courses', require('./routes/course.routes'));
 app.use('/api/classes', require('./routes/class.routes'));
+app.use('/api/auth', require('./routes/auth.routes'));
+app.use('/api/departments', require('./routes/department.routes'));
+app.use('/api/courses', require('./routes/course.routes'));
+app.use('/api/classes', require('./routes/class.routes'));
+app.use('/api/teachers', require('./routes/teacher.routes'));
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
