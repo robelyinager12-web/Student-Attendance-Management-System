@@ -7,9 +7,11 @@ const path = require('path');
 
 const notFoundMiddleware = require('./middlewares/notFound.middleware');
 const errorMiddleware = require('./middlewares/error.middleware');
+const { apiLimiter } = require('./middlewares/rateLimiter.middleware');
 
 const app = express();
 
+// ---- Core Middleware ----
 app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_URL || '*', credentials: true }));
 app.use(morgan('dev'));
@@ -17,68 +19,21 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// ---- Static Files (profile images) ----
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// ---- Health Check ----
 app.get('/', (req, res) => {
   res.json({ message: 'Student Attendance Management System API is running' });
 });
 
-app.use('/api/auth', require('./routes/auth.routes'));
-app.use('/api/auth', require('./routes/auth.routes'));
-app.use('/api/departments', require('./routes/department.routes'));
-app.use('/api/auth', require('./routes/auth.routes'));
-app.use('/api/departments', require('./routes/department.routes'));
-app.use('/api/courses', require('./routes/course.routes'));
-app.use('/api/auth', require('./routes/auth.routes'));
-app.use('/api/departments', require('./routes/department.routes'));
-app.use('/api/courses', require('./routes/course.routes'));
-app.use('/api/classes', require('./routes/class.routes'));
-app.use('/api/auth', require('./routes/auth.routes'));
-app.use('/api/departments', require('./routes/department.routes'));
-app.use('/api/courses', require('./routes/course.routes'));
-app.use('/api/classes', require('./routes/class.routes'));
-app.use('/api/teachers', require('./routes/teacher.routes'));
-app.use('/api/auth', require('./routes/auth.routes'));
-app.use('/api/departments', require('./routes/department.routes'));
-app.use('/api/courses', require('./routes/course.routes'));
-app.use('/api/classes', require('./routes/class.routes'));
-app.use('/api/teachers', require('./routes/teacher.routes'));
-app.use('/api/students', require('./routes/student.routes'));
-app.use('/api/auth', require('./routes/auth.routes'));
-app.use('/api/departments', require('./routes/department.routes'));
-app.use('/api/courses', require('./routes/course.routes'));
-app.use('/api/classes', require('./routes/class.routes'));
-app.use('/api/teachers', require('./routes/teacher.routes'));
-app.use('/api/students', require('./routes/student.routes'));
-app.use('/api/attendance', require('./routes/attendance.routes'));
-app.use('/api/auth', require('./routes/auth.routes'));
-app.use('/api/departments', require('./routes/department.routes'));
-app.use('/api/courses', require('./routes/course.routes'));
-app.use('/api/classes', require('./routes/class.routes'));
-app.use('/api/teachers', require('./routes/teacher.routes'));
-app.use('/api/students', require('./routes/student.routes'));
-app.use('/api/attendance', require('./routes/attendance.routes'));
-app.use('/api/reports', require('./routes/report.routes'));
-app.use('/api/auth', require('./routes/auth.routes'));
-app.use('/api/departments', require('./routes/department.routes'));
-app.use('/api/courses', require('./routes/course.routes'));
-app.use('/api/classes', require('./routes/class.routes'));
-app.use('/api/teachers', require('./routes/teacher.routes'));
-app.use('/api/students', require('./routes/student.routes'));
-app.use('/api/attendance', require('./routes/attendance.routes'));
-app.use('/api/reports', require('./routes/report.routes'));
-app.use('/api/dashboard', require('./routes/dashboard.routes'));
-app.use('/api/auth', require('./routes/auth.routes'));
-app.use('/api/departments', require('./routes/department.routes'));
-app.use('/api/courses', require('./routes/course.routes'));
-app.use('/api/classes', require('./routes/class.routes'));
-app.use('/api/teachers', require('./routes/teacher.routes'));
-app.use('/api/students', require('./routes/student.routes'));
-app.use('/api/attendance', require('./routes/attendance.routes'));
-app.use('/api/reports', require('./routes/report.routes'));
-app.use('/api/dashboard', require('./routes/dashboard.routes'));
-app.use('/api/notifications', require('./routes/notification.routes'));
+// ---- Rate Limiter (applied to all /api routes) ----
+app.use('/api', apiLimiter);
 
+// ---- All API Routes (mounted once through index) ----
+app.use('/api', require('./routes/index'));
+
+// ---- 404 & Error Handlers (always last) ----
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 
