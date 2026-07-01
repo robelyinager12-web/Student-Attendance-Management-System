@@ -1,0 +1,102 @@
+import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
+import { departmentService } from '../../services/department.service';
+import Table from '../../components/common/Table';
+import Modal from '../../components/common/Modal';
+import Breadcrumb from '../../components/common/Breadcrumb';
+import DepartmentForm from './DepartmentForm';
+import { MdAdd, MdDelete, MdEdit } from 'react-icons/md';
+
+function DepartmentList() {
+  const [departments, setDepartments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+
+  useEffect(() => { fetchDepartments(); }, []);
+
+  async function fetchDepartments() {
+    setLoading(true);
+    try {
+      const res = await departmentService.getAll();
+      setDepartments(res.data.data);
+    } catch (err) {
+      toast.error('Failed to load departments');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm('Delete this department?')) return;
+    try {
+      await departmentService.delete(id);
+      toast.success('Department deleted');
+      fetchDepartments();
+    } catch (err) {
+      toast.error('Failed to delete department');
+    }
+  }
+
+  const columns = [
+    { key: 'code', label: 'Code' },
+    { key: 'name', label: 'Name' },
+    { key: 'headOfDepartment', label: 'Head of Department' },
+    { key: 'description', label: 'Description' },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (row) => (
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setEditing(row); setShowModal(true); }}
+            className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50
+              dark:hover:bg-indigo-900/20"
+          >
+            <MdEdit size={18} />
+          </button>
+          <button
+            onClick={() => handleDelete(row.id)}
+            className="p-1.5 rounded-lg text-red-500 hover:bg-red-50
+              dark:hover:bg-red-900/20"
+          >
+            <MdDelete size={18} />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Departments' }]} />
+
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Departments</h1>
+        <button
+          onClick={() => { setEditing(null); setShowModal(true); }}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600
+            hover:bg-indigo-700 text-white text-sm font-medium rounded-lg"
+        >
+          <MdAdd size={18} /> Add Department
+        </button>
+      </div>
+
+      <Table columns={columns} data={departments} loading={loading} />
+
+      <Modal
+        isOpen={showModal}
+        onClose={() => { setShowModal(false); setEditing(null); }}
+        title={editing ? 'Edit Department' : 'Add Department'}
+      >
+        <DepartmentForm
+          initialData={editing}
+          onSuccess={() => { setShowModal(false); setEditing(null); fetchDepartments(); }}
+          onCancel={() => { setShowModal(false); setEditing(null); }}
+        />
+      </Modal>
+    </div>
+  );
+}
+
+export default DepartmentList;
