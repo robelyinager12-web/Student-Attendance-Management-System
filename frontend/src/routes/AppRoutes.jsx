@@ -31,13 +31,13 @@ import AttendanceHistory from '../pages/attendance/AttendanceHistory';
 import Reports from '../pages/reports/Reports';
 import Profile from '../pages/profile/Profile';
 import Settings from '../pages/profile/Settings';
+import Notifications from '../pages/notifications/Notifications';
 import NotFound from '../pages/NotFound';
 
 function DashboardRedirect() {
   const { user, loading } = useAuth();
 
   if (loading) return <LoadingSpinner />;
-
   if (user?.role === 'ADMIN') return <Navigate to="/dashboard/admin" replace />;
   if (user?.role === 'TEACHER') return <Navigate to="/dashboard/teacher" replace />;
   if (user?.role === 'STUDENT') return <Navigate to="/dashboard/student" replace />;
@@ -65,30 +65,21 @@ function AppRoutes() {
       >
         <Route path="/dashboard" element={<DashboardRedirect />} />
 
-        <Route
-          path="/dashboard/admin"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dashboard/teacher"
-          element={
-            <ProtectedRoute allowedRoles={['TEACHER']}>
-              <TeacherDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dashboard/student"
-          element={
-            <ProtectedRoute allowedRoles={['STUDENT']}>
-              <StudentDashboard />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/dashboard/admin" element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/teacher" element={
+          <ProtectedRoute allowedRoles={['TEACHER']}>
+            <TeacherDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/student" element={
+          <ProtectedRoute allowedRoles={['STUDENT']}>
+            <StudentDashboard />
+          </ProtectedRoute>
+        } />
 
         <Route path="/students" element={
           <ProtectedRoute allowedRoles={['ADMIN', 'TEACHER']}>
@@ -138,6 +129,7 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
+        <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/settings" element={<Settings />} />
       </Route>

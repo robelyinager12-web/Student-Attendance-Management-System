@@ -26,10 +26,24 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
-    const { accessToken, user } = res.data.data;
+
+    // Support different backend response shapes
+    const payload = res?.data?.data ?? res?.data;
+    const accessToken = payload?.accessToken;
+    const user = payload?.user;
+
+    if (!accessToken || !user) {
+      throw new Error('Invalid login response from server');
+    }
+
+    const normalizedUser = {
+      ...user,
+      role: user?.role ? String(user.role).toUpperCase() : user.role,
+    };
+
     localStorage.setItem('accessToken', accessToken);
-    setUser(user);
-    return user;
+    setUser(normalizedUser);
+    return normalizedUser;
   };
 
   const logout = async () => {
