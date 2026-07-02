@@ -13,6 +13,10 @@ const {
 
 const validate = require('../middlewares/validate.middleware');
 const authMiddleware = require('../middlewares/auth.middleware');
+const {
+  authLimiter,
+  passwordResetLimiter,
+} = require('../middlewares/rateLimiter.middleware');
 
 const {
   registerValidator,
@@ -21,12 +25,16 @@ const {
   resetPasswordValidator,
 } = require('../validators/auth.validator');
 
-router.post('/register', registerValidator, validate, register);
-router.post('/login', loginValidator, validate, login);
+// Auth limiter applied to login and register
+router.post('/register', authLimiter, registerValidator, validate, register);
+router.post('/login', authLimiter, loginValidator, validate, login);
 router.post('/logout', logout);
 router.post('/refresh-token', refreshAccessToken);
-router.post('/forgot-password', forgotPasswordValidator, validate, forgotPassword);
-router.post('/reset-password', resetPasswordValidator, validate, resetPassword);
+
+// Password reset gets its own strict limiter
+router.post('/forgot-password', passwordResetLimiter, forgotPasswordValidator, validate, forgotPassword);
+router.post('/reset-password', passwordResetLimiter, resetPasswordValidator, validate, resetPassword);
+
 router.get('/me', authMiddleware, getProfile);
 
 module.exports = router;
