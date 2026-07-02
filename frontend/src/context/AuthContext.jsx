@@ -11,7 +11,9 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('accessToken');
     if (token) {
       api.get('/auth/me')
-        .then((res) => setUser(res.data.data))
+        .then((res) => {
+          setUser(res.data.data);
+        })
         .catch(() => {
           localStorage.removeItem('accessToken');
           setUser(null);
@@ -31,7 +33,11 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    await api.post('/auth/logout');
+    try {
+      await api.post('/auth/logout');
+    } catch (err) {
+      // ignore logout errors
+    }
     localStorage.removeItem('accessToken');
     setUser(null);
   };

@@ -16,10 +16,19 @@ function Login() {
 
   const onSubmit = async (data) => {
     try {
-      const user = await login(data.email, data.password);
-      toast.success(`Welcome back, ${user.name}!`);
-      navigate('/dashboard');
+      const loggedInUser = await login(data.email, data.password);
+
+      toast.success(`Welcome back, ${loggedInUser.name}!`);
+
+      if (loggedInUser.role === 'ADMIN') {
+        navigate('/dashboard/admin', { replace: true });
+      } else if (loggedInUser.role === 'TEACHER') {
+        navigate('/dashboard/teacher', { replace: true });
+      } else {
+        navigate('/dashboard/student', { replace: true });
+      }
     } catch (err) {
+      console.error('Login error:', err);
       toast.error(err.response?.data?.message || 'Login failed');
     }
   };
@@ -80,7 +89,7 @@ function Login() {
           )}
         </div>
 
-        {/* Forgot password link */}
+        {/* Forgot password */}
         <div className="text-right">
           <Link
             to="/forgot-password"
@@ -101,6 +110,7 @@ function Login() {
         >
           {isSubmitting ? 'Signing in...' : 'Sign In'}
         </button>
+
       </form>
     </div>
   );
