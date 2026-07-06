@@ -1,21 +1,21 @@
 const rateLimit = require('express-rate-limit');
 
-// General API rate limiter
+const isDev = process.env.NODE_ENV === 'development';
+
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  windowMs: 15 * 60 * 1000,
+  max: isDev ? 10000 : 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     success: false,
-    message: 'Too many requests from this IP, please try again after 15 minutes',
+    message: 'Too many requests, please try again after 15 minutes',
   },
 });
 
-// Strict limiter for login and register
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: isDev ? 10000 : 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -24,10 +24,9 @@ const authLimiter = rateLimit({
   },
 });
 
-// Very strict for password reset
 const passwordResetLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5,
+  windowMs: 60 * 60 * 1000,
+  max: isDev ? 10000 : 5,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

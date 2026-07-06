@@ -20,7 +20,12 @@ app.use(helmet({
 
 // ---- CORS ----
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  // Allow the frontend dev server origin (and any other explicitly set origin)
+  origin: [
+    process.env.CLIENT_URL,
+    'http://localhost:5173',
+    'http://localhost:5177',
+  ].filter(Boolean),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
