@@ -1,5 +1,4 @@
 const { Op } = require('sequelize');
-const { checkLowAttendanceAndNotify } = require('../services/notification.service');
 const asyncHandler = require('../utils/asyncHandler');
 const { success, error } = require('../utils/apiResponse');
 const { Attendance, Student, User, Class, Course, Teacher } = require('../models');
@@ -14,15 +13,38 @@ const markAttendance = asyncHandler(async (req, res) => {
   const classData = await Class.findByPk(classId);
   if (!classData) return error(res, 404, 'Class not found');
 
+  // Get teacherId — works for both TEACHER and ADMIN roles
   let teacherId = await getTeacherIdFromUser(req.user.id);
-  if (!teacherId && req.user.role === 'ADMIN') {
+
+  if (!teacherId) {
+    // Admin marking attendance — use the class assigned teacher
     teacherId = classData.teacherId;
   }
 
-  const attendance = await markSingleAttendance({ studentId, classId, courseId, date, status, remark, teacherId });
+  if (!teacherId) {
+    // No teacher assigned to class — find any teacher as fallback
+    const anyTeacher = await Teacher.findOne();
+    teacherId = anyTeacher ? anyTeacher.id : null;
+  }
 
-  // Check attendance health in the background (don't block the response)
-  checkLowAttendanceAndNotify(studentId).catch((err) => console.error('Low attendance check failed:', err));
+  if (!teacherId) {
+    return error(res, 400, 'No teacher found. Please assign a teacher to this class first.');
+  }
+
+  const attendance = await markSingleAttendance({
+    studentId,
+    classId,
+    courseId,
+    date,
+    status,
+    remark,
+    teacherId,
+  });
+
+  const { checkLowAttendanceAndNotify } = require('../services/notification.service');
+  checkLowAttendanceAndNotify(studentId).catch((err) =>
+    console.error('Low attendance check failed:', err)
+  );
 
   return success(res, 201, 'Attendance marked successfully', attendance);
 });
@@ -33,9 +55,20 @@ const markBulkAttendance = asyncHandler(async (req, res) => {
   const classData = await Class.findByPk(classId);
   if (!classData) return error(res, 404, 'Class not found');
 
+  // Get teacherId — works for both TEACHER and ADMIN roles
   let teacherId = await getTeacherIdFromUser(req.user.id);
-  if (!teacherId && req.user.role === 'ADMIN') {
+
+  if (!teacherId) {
     teacherId = classData.teacherId;
+  }
+
+  if (!teacherId) {
+    const anyTeacher = await Teacher.findOne();
+    teacherId = anyTeacher ? anyTeacher.id : null;
+  }
+
+  if (!teacherId) {
+    return error(res, 400, 'No teacher found. Please assign a teacher to this class first.');
   }
 
   const results = [];
@@ -50,38 +83,37 @@ const markBulkAttendance = asyncHandler(async (req, res) => {
       teacherId,
     });
     results.push(attendance);
-    checkLowAttendanceAndNotify(record.studentId).catch((err) => console.error('Low attendance check failed:', err));
+
+    const { checkLowAttendanceAndNotify } = require('../services/notification.service');
+    checkLowAttendanceAndNotify(record.studentId).catch((err) =>
+      console.error('Low attendance check failed:', err)
+    );
   }
 
-  return success(res, 201, 'Bulk attendance marked successfully', { count: results.length, records: results });
+  return success(res, 201, 'Bulk attendance marked successfully', {
+    count: results.length,
+    records: results,
+  });
 });
 
 const updateAttendance = asyncHandler(async (req, res) => {
   const { id } = req.params;
-
   const attendance = await Attendance.findByPk(id);
   if (!attendance) return error(res, 404, 'Attendance record not found');
-
   await attendance.update(req.body);
-
   return success(res, 200, 'Attendance updated successfully', attendance);
 });
 
 const deleteAttendance = asyncHandler(async (req, res) => {
   const { id } = req.params;
-
   const attendance = await Attendance.findByPk(id);
   if (!attendance) return error(res, 404, 'Attendance record not found');
-
   await attendance.destroy();
-
   return success(res, 200, 'Attendance record deleted successfully');
 });
 
-// GET /api/attendance?classId=&date= (defaults to today)
 const getClassAttendance = asyncHandler(async (req, res) => {
   const { classId, date } = req.query;
-
   if (!classId) return error(res, 400, 'classId query parameter is required');
 
   const attendanceDate = normalizeDate(date);
@@ -99,7 +131,6 @@ const getClassAttendance = asyncHandler(async (req, res) => {
   return success(res, 200, 'Class attendance fetched successfully', records);
 });
 
-// GET /api/attendance/student/:studentId?from=&to=
 const getStudentAttendance = asyncHandler(async (req, res) => {
   const { studentId } = req.params;
   const { from, to } = req.query;
@@ -111,7 +142,10 @@ const getStudentAttendance = asyncHandler(async (req, res) => {
 
   const records = await Attendance.findAll({
     where,
-    include: [{ model: Class, attributes: ['name', 'section'] }, { model: Course, attributes: ['name', 'code'] }],
+    include: [
+      { model: Class, attributes: ['name', 'section'] },
+      { model: Course, attributes: ['name', 'code'] },
+    ],
     order: [['date', 'DESC']],
   });
 
@@ -128,7 +162,6 @@ const getStudentAttendance = asyncHandler(async (req, res) => {
   });
 });
 
-// GET /api/attendance/weekly?classId=&startDate=
 const getWeeklyAttendance = asyncHandler(async (req, res) => {
   const { classId, startDate } = req.query;
   if (!classId || !startDate) return error(res, 400, 'classId and startDate are required');
@@ -146,10 +179,11 @@ const getWeeklyAttendance = asyncHandler(async (req, res) => {
   return success(res, 200, 'Weekly attendance fetched successfully', records);
 });
 
-// GET /api/attendance/monthly?classId=&month=&year=
 const getMonthlyAttendance = asyncHandler(async (req, res) => {
   const { classId, month, year } = req.query;
-  if (!classId || !month || !year) return error(res, 400, 'classId, month, and year are required');
+  if (!classId || !month || !year) {
+    return error(res, 400, 'classId, month, and year are required');
+  }
 
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0);
