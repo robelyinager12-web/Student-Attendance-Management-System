@@ -1,19 +1,18 @@
 const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
-  const Department = sequelize.define('Department', {
+  const Program = sequelize.define('Program', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
     name: { type: DataTypes.STRING, allowNull: false },
     code: { type: DataTypes.STRING, allowNull: false, unique: true },
     description: { type: DataTypes.TEXT, allowNull: true },
-    headOfDepartment: { type: DataTypes.STRING, allowNull: true },
+    duration: { type: DataTypes.INTEGER, allowNull: true, comment: 'Duration in years' },
+    departmentId: { type: DataTypes.UUID, allowNull: false },
     collegeId: { type: DataTypes.UUID, allowNull: true },
-    email: { type: DataTypes.STRING, allowNull: true },
-    phone: { type: DataTypes.STRING, allowNull: true },
   }, {
-    tableName: 'departments',
+    tableName: 'programs',
     timestamps: true,
   });
 
-  return Department;
+  return Program;
 };

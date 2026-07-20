@@ -6,7 +6,14 @@ module.exports = (sequelize) => {
     studentId: { type: DataTypes.UUID, allowNull: false },
     teacherId: { type: DataTypes.UUID, allowNull: false },
     courseId: { type: DataTypes.UUID, allowNull: true },
-    classId: { type: DataTypes.UUID, allowNull: false },
+    classId: { type: DataTypes.UUID, allowNull: true },
+
+    // New Injibara fields
+    sectionId: { type: DataTypes.UUID, allowNull: true },
+    semesterId: { type: DataTypes.UUID, allowNull: true },
+    batchId: { type: DataTypes.UUID, allowNull: true },
+    academicYearId: { type: DataTypes.UUID, allowNull: true },
+
     date: { type: DataTypes.DATEONLY, allowNull: false },
     time: { type: DataTypes.TIME, allowNull: true },
     status: {
@@ -17,7 +24,7 @@ module.exports = (sequelize) => {
   }, {
     tableName: 'attendance',
     timestamps: true,
-    indexes: [{ unique: true, fields: ['studentId', 'classId', 'date'] }],
+    indexes: [{ unique: true, fields: ['studentId', 'courseId', 'date'] }],
   });
 
   return Attendance;
