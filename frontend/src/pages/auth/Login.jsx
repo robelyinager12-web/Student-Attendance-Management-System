@@ -15,23 +15,24 @@ function Login() {
   } = useForm();
 
   const onSubmit = async (data) => {
-    try {
-      const loggedInUser = await login(data.email, data.password);
+  try {
+    const loggedInUser = await login(data.email, data.password);
 
-      toast.success(`Welcome back, ${loggedInUser.name}!`);
+    toast.success(`Welcome back, ${loggedInUser.name}!`);
 
-      if (loggedInUser.role === 'ADMIN') {
-        navigate('/dashboard/admin', { replace: true });
-      } else if (loggedInUser.role === 'TEACHER') {
-        navigate('/dashboard/teacher', { replace: true });
-      } else {
-        navigate('/dashboard/student', { replace: true });
-      }
-    } catch (err) {
-      console.error('Login error:', err);
-      toast.error(err.response?.data?.message || 'Login failed');
+    // Force redirect based on role
+    if (loggedInUser.role === 'ADMIN') {
+      window.location.href = '/dashboard/admin';
+    } else if (loggedInUser.role === 'TEACHER') {
+      window.location.href = '/dashboard/teacher';
+    } else {
+      window.location.href = '/dashboard/student';
     }
-  };
+  } catch (err) {
+    console.error('Login error:', err);
+    toast.error(err.response?.data?.message || 'Login failed. Check your email and password.');
+  }
+};
 
   return (
     <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl
