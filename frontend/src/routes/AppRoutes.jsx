@@ -13,6 +13,7 @@ import ResetPassword from '../pages/auth/ResetPassword';
 import AdminDashboard from '../pages/dashboard/AdminDashboard';
 import TeacherDashboard from '../pages/dashboard/TeacherDashboard';
 import StudentDashboard from '../pages/dashboard/StudentDashboard';
+import ImportStudents from '../pages/students/ImportStudents';
 
 import StudentList from '../pages/students/StudentList';
 import StudentForm from '../pages/students/StudentForm';
@@ -70,6 +71,11 @@ function AppRoutes() {
             <AdminDashboard />
           </ProtectedRoute>
         } />
+        <Route path="/students/import" element={
+  <ProtectedRoute allowedRoles={['ADMIN']}>
+    <ImportStudents />
+  </ProtectedRoute>
+} />
         <Route path="/dashboard/teacher" element={
           <ProtectedRoute allowedRoles={['TEACHER']}>
             <TeacherDashboard />
