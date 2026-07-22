@@ -50,16 +50,21 @@ const markAttendance = asyncHandler(async (req, res) => {
 });
 
 const markBulkAttendance = asyncHandler(async (req, res) => {
-  const { classId, courseId, date, records } = req.body;
+  const { classId, sectionId, courseId, date, records } = req.body;
 
-  const classData = await Class.findByPk(classId);
-  if (!classData) return error(res, 404, 'Class not found');
+  if (!Array.isArray(records) || records.length === 0) {
+    return error(res, 400, 'records[] is required and must not be empty');
+  }
 
-  // Get teacherId — works for both TEACHER and ADMIN roles
+  if (!classId && !sectionId) {
+    return error(res, 400, 'classId or sectionId is required');
+  }
+
   let teacherId = await getTeacherIdFromUser(req.user.id);
 
-  if (!teacherId) {
-    teacherId = classData.teacherId;
+  if (!teacherId && classId) {
+    const classData = await Class.findByPk(classId);
+    if (classData) teacherId = classData.teacherId;
   }
 
   if (!teacherId) {
@@ -68,31 +73,46 @@ const markBulkAttendance = asyncHandler(async (req, res) => {
   }
 
   if (!teacherId) {
-    return error(res, 400, 'No teacher found. Please assign a teacher to this class first.');
+    return error(res, 400, 'No teacher found. Please create a teacher account first.');
   }
 
   const results = [];
   for (const record of records) {
-    const attendance = await markSingleAttendance({
+    const attendanceDate = normalizeDate(date);
+
+    // Build unique key — use sectionId+courseId if provided
+    const whereClause = {
       studentId: record.studentId,
-      classId,
-      courseId,
-      date,
-      status: record.status,
-      remark: record.remark,
-      teacherId,
+      date: attendanceDate,
+    };
+
+    if (courseId) whereClause.courseId = courseId;
+    else if (classId) whereClause.classId = classId;
+
+    const [attendance] = await Attendance.findOrCreate({
+      where: whereClause,
+      defaults: {
+        studentId: record.studentId,
+        teacherId,
+        classId: classId || null,
+        sectionId: sectionId || null,
+        courseId: courseId || null,
+        date: attendanceDate,
+        time: new Date().toTimeString().split(' ')[0],
+        status: record.status,
+        remark: record.remark || null,
+      },
     });
+
+    await attendance.update({ status: record.status, remark: record.remark || null });
     results.push(attendance);
 
     const { checkLowAttendanceAndNotify } = require('../services/notification.service');
-    checkLowAttendanceAndNotify(record.studentId).catch((err) =>
-      console.error('Low attendance check failed:', err)
-    );
+    checkLowAttendanceAndNotify(record.studentId).catch(() => {});
   }
 
   return success(res, 201, 'Bulk attendance marked successfully', {
     count: results.length,
-    records: results,
   });
 });
 
@@ -196,6 +216,29 @@ const getMonthlyAttendance = asyncHandler(async (req, res) => {
 
   return success(res, 200, 'Monthly attendance fetched successfully', records);
 });
+// GET /api/attendance/section?sectionId=&courseId=&date=
+const getSectionAttendance = asyncHandler(async (req, res) => {
+  const { sectionId, courseId, date } = req.query;
+  if (!sectionId) return error(res, 400, 'sectionId is required');
+
+  const attendanceDate = normalizeDate(date);
+  const where = { sectionId, date: attendanceDate };
+  if (courseId) where.courseId = courseId;
+
+  const records = await Attendance.findAll({
+    where,
+    include: [
+      {
+        model: Student,
+        include: [{ model: User, attributes: ['name', 'email'] }],
+      },
+      { model: Course, attributes: ['name', 'code'] },
+    ],
+    order: [['createdAt', 'ASC']],
+  });
+
+  return success(res, 200, 'Section attendance fetched', records);
+});
 
 module.exports = {
   markAttendance,
@@ -203,6 +246,7 @@ module.exports = {
   updateAttendance,
   deleteAttendance,
   getClassAttendance,
+  getSectionAttendance,
   getStudentAttendance,
   getWeeklyAttendance,
   getMonthlyAttendance,

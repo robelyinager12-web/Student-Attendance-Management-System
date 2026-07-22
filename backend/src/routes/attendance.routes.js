@@ -7,6 +7,7 @@ const {
   updateAttendance,
   deleteAttendance,
   getClassAttendance,
+  getSectionAttendance,
   getStudentAttendance,
   getWeeklyAttendance,
   getMonthlyAttendance,
@@ -31,6 +32,7 @@ router.delete('/:id', authorize('ADMIN', 'TEACHER'), deleteAttendance);
 router.get('/', authorize('ADMIN', 'TEACHER'), getClassAttendance); // ?classId=&date=
 router.get('/weekly', authorize('ADMIN', 'TEACHER'), getWeeklyAttendance); // ?classId=&startDate=
 router.get('/monthly', authorize('ADMIN', 'TEACHER'), getMonthlyAttendance); // ?classId=&month=&year=
+router.get('/section', getSectionAttendance);
 router.get('/student/:studentId', getStudentAttendance); // student can view their own; ?from=&to=
 
 module.exports = router;
