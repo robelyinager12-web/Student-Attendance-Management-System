@@ -4,15 +4,26 @@ import {
   MdDashboard, MdPeople, MdSchool, MdClass,
   MdLibraryBooks, MdAssignment, MdBarChart,
   MdNotifications, MdPerson, MdSettings,
+  MdGroup, MdCalendarMonth,
 } from 'react-icons/md';
 
 const adminLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: <MdDashboard size={20} /> },
   { to: '/students', label: 'Students', icon: <MdPeople size={20} /> },
   { to: '/teachers', label: 'Teachers', icon: <MdSchool size={20} /> },
-  { to: '/classes', label: 'Classes', icon: <MdClass size={20} /> },
+
+  // Academic Structure
+  { to: '/programs', label: 'Programs', icon: <MdLibraryBooks size={20} /> },
+  { to: '/batches', label: 'Batches', icon: <MdGroup size={20} /> },
+  { to: '/academic', label: 'Academic Years', icon: <MdCalendarMonth size={20} /> },
+  { to: '/sections', label: 'Sections', icon: <MdClass size={20} /> },
+
+  // Class & Course
   { to: '/departments', label: 'Departments', icon: <MdLibraryBooks size={20} /> },
   { to: '/courses', label: 'Courses', icon: <MdAssignment size={20} /> },
+  { to: '/classes', label: 'Classes', icon: <MdClass size={20} /> },
+
+  // Core
   { to: '/attendance', label: 'Attendance', icon: <MdAssignment size={20} /> },
   { to: '/reports', label: 'Reports', icon: <MdBarChart size={20} /> },
   { to: '/notifications', label: 'Notifications', icon: <MdNotifications size={20} /> },

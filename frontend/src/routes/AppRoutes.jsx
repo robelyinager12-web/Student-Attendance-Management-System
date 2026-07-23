@@ -1,3 +1,8 @@
+import ProgramList from '../pages/programs/ProgramList';
+import BatchList from '../pages/batches/BatchList';
+import AcademicStructure from '../pages/academic/AcademicStructure';
+import SectionList from '../pages/sections/SectionList';
+
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -81,6 +86,27 @@ function AppRoutes() {
             <StudentDashboard />
           </ProtectedRoute>
         } />
+        {/* Academic Structure */}
+<Route path="/programs" element={
+  <ProtectedRoute allowedRoles={['ADMIN']}>
+    <ProgramList />
+  </ProtectedRoute>
+} />
+<Route path="/batches" element={
+  <ProtectedRoute allowedRoles={['ADMIN']}>
+    <BatchList />
+  </ProtectedRoute>
+} />
+<Route path="/academic" element={
+  <ProtectedRoute allowedRoles={['ADMIN']}>
+    <AcademicStructure />
+  </ProtectedRoute>
+} />
+<Route path="/sections" element={
+  <ProtectedRoute allowedRoles={['ADMIN']}>
+    <SectionList />
+  </ProtectedRoute>
+} />
 
         {/* Students */}
         <Route path="/students" element={
