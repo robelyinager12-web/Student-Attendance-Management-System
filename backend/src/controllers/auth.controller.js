@@ -23,7 +23,18 @@ const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
   const { user, accessToken, refreshToken } = await authService.loginUser({ email, password });
+  const auditLog = require('../services/auditLog.service');
 
+// Inside login function, after const token = generateToken(user):
+await auditLog.log({
+  userId: user.id,
+  userRole: user.role,
+  action: 'LOGIN',
+  entity: 'User',
+  entityId: user.id,
+  description: `${user.role} logged in`,
+  req,
+});
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
