@@ -22,5 +22,6 @@ router.use('/academic-years', require('./academicYear.routes'));
 router.use('/semesters', require('./semester.routes'));
 router.use('/sections', require('./section.routes'));
 router.use('/import', require('./import.routes'));
+router.use('/settings', require('./settings.routes'));
 
 module.exports = router;
