@@ -13,11 +13,11 @@ import ResetPassword from '../pages/auth/ResetPassword';
 import AdminDashboard from '../pages/dashboard/AdminDashboard';
 import TeacherDashboard from '../pages/dashboard/TeacherDashboard';
 import StudentDashboard from '../pages/dashboard/StudentDashboard';
-import ImportStudents from '../pages/students/ImportStudents';
 
 import StudentList from '../pages/students/StudentList';
 import StudentForm from '../pages/students/StudentForm';
 import StudentProfile from '../pages/students/StudentProfile';
+import ImportStudents from '../pages/students/ImportStudents';
 
 import TeacherList from '../pages/teachers/TeacherList';
 import TeacherForm from '../pages/teachers/TeacherForm';
@@ -49,33 +49,28 @@ function DashboardRedirect() {
 function AppRoutes() {
   return (
     <Routes>
-      {/* Auth routes */}
+
+      {/* ── Auth routes ── */}
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
       </Route>
 
-      {/* Dashboard routes */}
-      <Route
-        element={
-          <ProtectedRoute>
-            <DashboardLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/dashboard" element={<DashboardRedirect />} />
+      {/* ── Protected dashboard routes ── */}
+      <Route element={
+        <ProtectedRoute>
+          <DashboardLayout />
+        </ProtectedRoute>
+      }>
 
+        {/* Dashboard */}
+        <Route path="/dashboard" element={<DashboardRedirect />} />
         <Route path="/dashboard/admin" element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <AdminDashboard />
           </ProtectedRoute>
         } />
-        <Route path="/students/import" element={
-  <ProtectedRoute allowedRoles={['ADMIN']}>
-    <ImportStudents />
-  </ProtectedRoute>
-} />
         <Route path="/dashboard/teacher" element={
           <ProtectedRoute allowedRoles={['TEACHER']}>
             <TeacherDashboard />
@@ -87,6 +82,7 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
+        {/* Students */}
         <Route path="/students" element={
           <ProtectedRoute allowedRoles={['ADMIN', 'TEACHER']}>
             <StudentList />
@@ -97,8 +93,14 @@ function AppRoutes() {
             <StudentForm />
           </ProtectedRoute>
         } />
+        <Route path="/students/import" element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <ImportStudents />
+          </ProtectedRoute>
+        } />
         <Route path="/students/:id" element={<StudentProfile />} />
 
+        {/* Teachers */}
         <Route path="/teachers" element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <TeacherList />
@@ -110,6 +112,7 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
+        {/* Academic */}
         <Route path="/departments" element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <DepartmentList />
@@ -126,22 +129,33 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
+        {/* Attendance */}
         <Route path="/attendance" element={<TakeAttendance />} />
         <Route path="/attendance/history" element={<AttendanceHistory />} />
 
+        {/* Reports */}
         <Route path="/reports" element={
           <ProtectedRoute allowedRoles={['ADMIN', 'TEACHER']}>
             <Reports />
           </ProtectedRoute>
         } />
 
+        {/* Other */}
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<Profile />} />
-        <Route path="/settings" element={<Settings />} />
-      </Route>
+        <Route path="/settings" element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <Settings />
+          </ProtectedRoute>
+        } />
 
+      </Route>
+      {/* ── End dashboard routes ── */}
+
+      {/* ── Fallback routes ── */}
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<NotFound />} />
+
     </Routes>
   );
 }
