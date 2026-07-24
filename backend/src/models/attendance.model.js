@@ -12,7 +12,7 @@ module.exports = (sequelize) => {
     batchId: { type: DataTypes.UUID, allowNull: true },
     academicYearId: { type: DataTypes.UUID, allowNull: true },
 
-    // Link to AttendanceSession
+    // Plain UUID — no FK constraint to avoid circular sync issue
     sessionId: { type: DataTypes.UUID, allowNull: true },
 
     date: { type: DataTypes.DATEONLY, allowNull: false },
@@ -22,8 +22,6 @@ module.exports = (sequelize) => {
       allowNull: false,
     },
     remark: { type: DataTypes.STRING, allowNull: true },
-
-    // Audit fields
     markedById: { type: DataTypes.UUID, allowNull: true },
     editedById: { type: DataTypes.UUID, allowNull: true },
     editedAt: { type: DataTypes.DATE, allowNull: true },
@@ -31,7 +29,11 @@ module.exports = (sequelize) => {
     tableName: 'attendance',
     timestamps: true,
     indexes: [
-      { unique: true, fields: ['studentId', 'courseId', 'date', 'sectionId'] },
+      {
+        unique: true,
+        fields: ['studentId', 'courseId', 'date', 'sectionId'],
+        name: 'unique_attendance_record',
+      },
     ],
   });
 

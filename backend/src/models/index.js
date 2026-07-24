@@ -215,8 +215,8 @@ Student.hasMany(StudentEnrollment, { foreignKey: 'studentId' });
 StudentEnrollment.belongsTo(Student, { foreignKey: 'studentId' });
 
 // ── AttendanceSession associations ───────────────────────────────────────────
-AttendanceSession.hasMany(Attendance, { foreignKey: 'sessionId' });
-Attendance.belongsTo(AttendanceSession, { foreignKey: 'sessionId' });
+// sessionId is stored as plain UUID on Attendance
+// No FK constraint to avoid circular sync — query manually when needed
 
 // ══════════════════════════════════════════════════════════════
 // EXPORTS
