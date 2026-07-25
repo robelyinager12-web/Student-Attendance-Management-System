@@ -1,63 +1,59 @@
 const { Op } = require('sequelize');
 const asyncHandler = require('../utils/asyncHandler');
 const { success, error } = require('../utils/apiResponse');
-const { Attendance, Student, User, Class, Course, Teacher } = require('../models');
-const { getTeacherIdFromUser, normalizeDate, markSingleAttendance } = require('../services/attendance.service');
+const {
+  Attendance, Student, User, Class, Course,
+  Teacher, Section, Batch, Semester,
+  CourseAssignment, StudentEnrollment,
+  AttendanceSession,
+} = require('../models');
+const {
+  getTeacherIdFromUser,
+  normalizeDate,
+  markSingleAttendance,
+} = require('../services/attendance.service');
+const auditLog = require('../services/auditLog.service');
 
+// ── Mark single attendance ───────────────────────────────────────────────────
 const markAttendance = asyncHandler(async (req, res) => {
-  const { studentId, classId, courseId, date, status, remark } = req.body;
+  const { studentId, classId, sectionId, courseId, date, status, remark } = req.body;
 
   const student = await Student.findByPk(studentId);
   if (!student) return error(res, 404, 'Student not found');
 
-  const classData = await Class.findByPk(classId);
-  if (!classData) return error(res, 404, 'Class not found');
+  const classData = classId ? await Class.findByPk(classId) : null;
 
-  // Get teacherId — works for both TEACHER and ADMIN roles
   let teacherId = await getTeacherIdFromUser(req.user.id);
-
+  if (!teacherId && classData) teacherId = classData.teacherId;
   if (!teacherId) {
-    // Admin marking attendance — use the class assigned teacher
-    teacherId = classData.teacherId;
-  }
-
-  if (!teacherId) {
-    // No teacher assigned to class — find any teacher as fallback
     const anyTeacher = await Teacher.findOne();
     teacherId = anyTeacher ? anyTeacher.id : null;
   }
 
-  if (!teacherId) {
-    return error(res, 400, 'No teacher found. Please assign a teacher to this class first.');
-  }
-
   const attendance = await markSingleAttendance({
-    studentId,
-    classId,
-    courseId,
-    date,
-    status,
-    remark,
-    teacherId,
+    studentId, classId, sectionId, courseId,
+    date, status, remark, teacherId,
   });
 
   const { checkLowAttendanceAndNotify } = require('../services/notification.service');
-  checkLowAttendanceAndNotify(studentId).catch((err) =>
-    console.error('Low attendance check failed:', err)
-  );
+  checkLowAttendanceAndNotify(studentId).catch(() => {});
 
   return success(res, 201, 'Attendance marked successfully', attendance);
 });
 
+// ── Mark bulk attendance ─────────────────────────────────────────────────────
 const markBulkAttendance = asyncHandler(async (req, res) => {
-  const { classId, sectionId, courseId, date, records } = req.body;
+  const {
+    classId, sectionId, courseId, batchId,
+    semesterId, date, records, topic, notes,
+  } = req.body;
 
   if (!Array.isArray(records) || records.length === 0) {
     return error(res, 400, 'records[] is required and must not be empty');
   }
 
-  if (!classId && !sectionId) {
-    return error(res, 400, 'classId or sectionId is required');
+  if (!classId && !sectionId && !courseId) {
+    return error(res, 400, 'classId, sectionId, or courseId is required');
   }
 
   let teacherId = await getTeacherIdFromUser(req.user.id);
@@ -76,54 +72,117 @@ const markBulkAttendance = asyncHandler(async (req, res) => {
     return error(res, 400, 'No teacher found. Please create a teacher account first.');
   }
 
+  const attendanceDate = normalizeDate(date);
+
+  // Create or find AttendanceSession
+  const [session] = await AttendanceSession.findOrCreate({
+    where: {
+      courseId: courseId || null,
+      sectionId: sectionId || null,
+      date: attendanceDate,
+      teacherId,
+    },
+    defaults: {
+      courseId: courseId || null,
+      teacherId,
+      sectionId: sectionId || null,
+      batchId: batchId || null,
+      semesterId: semesterId || null,
+      date: attendanceDate,
+      topic: topic || null,
+      notes: notes || null,
+      status: 'COMPLETED',
+    },
+  });
+
   const results = [];
   for (const record of records) {
-    const attendanceDate = normalizeDate(date);
+    const existing = await Attendance.findOne({
+      where: {
+        studentId: record.studentId,
+        courseId: courseId || null,
+        sectionId: sectionId || null,
+        date: attendanceDate,
+      },
+    });
 
-    // Build unique key — use sectionId+courseId if provided
-    const whereClause = {
-      studentId: record.studentId,
-      date: attendanceDate,
-    };
-
-    if (courseId) whereClause.courseId = courseId;
-    else if (classId) whereClause.classId = classId;
-
-    const [attendance] = await Attendance.findOrCreate({
-      where: whereClause,
-      defaults: {
+    if (existing) {
+      await existing.update({
+        status: record.status,
+        remark: record.remark || null,
+        editedById: req.user.id,
+        editedAt: new Date(),
+      });
+      results.push(existing);
+    } else {
+      const newRecord = await Attendance.create({
         studentId: record.studentId,
         teacherId,
         classId: classId || null,
         sectionId: sectionId || null,
         courseId: courseId || null,
+        batchId: batchId || null,
+        semesterId: semesterId || null,
+        sessionId: session.id,
         date: attendanceDate,
         time: new Date().toTimeString().split(' ')[0],
         status: record.status,
         remark: record.remark || null,
-      },
-    });
-
-    await attendance.update({ status: record.status, remark: record.remark || null });
-    results.push(attendance);
+        markedById: req.user.id,
+      });
+      results.push(newRecord);
+    }
 
     const { checkLowAttendanceAndNotify } = require('../services/notification.service');
     checkLowAttendanceAndNotify(record.studentId).catch(() => {});
   }
 
+  await auditLog.log({
+    userId: req.user.id,
+    userRole: req.user.role,
+    action: 'ATTENDANCE_MARK',
+    entity: 'Attendance',
+    entityId: session.id,
+    newValues: { courseId, sectionId, date, count: results.length },
+    description: `Attendance marked for ${results.length} students`,
+    req,
+  });
+
   return success(res, 201, 'Bulk attendance marked successfully', {
+    session,
     count: results.length,
   });
 });
 
+// ── Update attendance ────────────────────────────────────────────────────────
 const updateAttendance = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const attendance = await Attendance.findByPk(id);
   if (!attendance) return error(res, 404, 'Attendance record not found');
-  await attendance.update(req.body);
+
+  const old = { status: attendance.status, remark: attendance.remark };
+  await attendance.update({
+    ...req.body,
+    editedById: req.user.id,
+    editedAt: new Date(),
+  });
+
+  await auditLog.log({
+    userId: req.user.id,
+    userRole: req.user.role,
+    action: 'ATTENDANCE_EDIT',
+    entity: 'Attendance',
+    entityId: id,
+    oldValues: old,
+    newValues: { status: req.body.status, remark: req.body.remark },
+    description: 'Attendance record edited',
+    req,
+  });
+
   return success(res, 200, 'Attendance updated successfully', attendance);
 });
 
+// ── Delete attendance ────────────────────────────────────────────────────────
 const deleteAttendance = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const attendance = await Attendance.findByPk(id);
@@ -132,6 +191,7 @@ const deleteAttendance = asyncHandler(async (req, res) => {
   return success(res, 200, 'Attendance record deleted successfully');
 });
 
+// ── Get class attendance ─────────────────────────────────────────────────────
 const getClassAttendance = asyncHandler(async (req, res) => {
   const { classId, date } = req.query;
   if (!classId) return error(res, 400, 'classId query parameter is required');
@@ -151,6 +211,128 @@ const getClassAttendance = asyncHandler(async (req, res) => {
   return success(res, 200, 'Class attendance fetched successfully', records);
 });
 
+// ── Get section attendance ───────────────────────────────────────────────────
+const getSectionAttendance = asyncHandler(async (req, res) => {
+  const { sectionId, courseId, date } = req.query;
+  if (!sectionId) return error(res, 400, 'sectionId is required');
+
+  const attendanceDate = normalizeDate(date);
+  const where = { sectionId, date: attendanceDate };
+  if (courseId) where.courseId = courseId;
+
+  const records = await Attendance.findAll({
+    where,
+    include: [
+      { model: Student, include: [{ model: User, attributes: ['name', 'email'] }] },
+      { model: Course, attributes: ['name', 'code'] },
+    ],
+    order: [['createdAt', 'ASC']],
+  });
+
+  return success(res, 200, 'Section attendance fetched', records);
+});
+
+// ── Get students for attendance (teacher flow) ───────────────────────────────
+const getStudentsForAttendance = asyncHandler(async (req, res) => {
+  const { courseId, sectionId, batchId } = req.query;
+
+  if (!courseId) return error(res, 400, 'courseId is required');
+
+  const teacher = await Teacher.findOne({ where: { userId: req.user.id } });
+
+  // Verify teacher assignment if teacher role
+  if (req.user.role === 'TEACHER') {
+    if (!teacher) return error(res, 404, 'Teacher profile not found');
+
+    const assignment = await CourseAssignment.findOne({
+      where: {
+        teacherId: teacher.id,
+        courseId,
+        isActive: true,
+        ...(sectionId && { sectionId }),
+        ...(batchId && { batchId }),
+      },
+    });
+
+    if (!assignment) {
+      return error(res, 403, 'You are not assigned to this course');
+    }
+  }
+
+  // Build student query
+  const where = { status: 'ACTIVE' };
+  if (sectionId) where.sectionId = sectionId;
+  if (batchId) where.batchId = batchId;
+
+  // First try enrolled students
+  const enrollments = await StudentEnrollment.findAll({
+    where: {
+      courseId,
+      status: 'ACTIVE',
+      ...(sectionId && { sectionId }),
+      ...(batchId && { batchId }),
+    },
+    include: [
+      {
+        model: Student,
+        where: { status: 'ACTIVE' },
+        include: [{ model: User, attributes: ['name', 'email'] }],
+      },
+    ],
+  });
+
+  let students = enrollments.map((e) => e.Student).filter(Boolean);
+
+  // Fall back to students by section/batch if no enrollments
+  if (students.length === 0) {
+    students = await Student.findAll({
+      where,
+      include: [{ model: User, attributes: ['name', 'email'] }],
+      order: [[User, 'name', 'ASC']],
+    });
+  }
+
+  return success(res, 200, 'Students fetched for attendance', students);
+});
+
+// ── Check if session already exists ─────────────────────────────────────────
+const checkSessionAttendance = asyncHandler(async (req, res) => {
+  const { courseId, sectionId, date } = req.query;
+
+  if (!courseId || !date) {
+    return error(res, 400, 'courseId and date are required');
+  }
+
+  const attendanceDate = normalizeDate(date);
+
+  const existingSession = await AttendanceSession.findOne({
+    where: {
+      courseId,
+      date: attendanceDate,
+      ...(sectionId && { sectionId }),
+    },
+  });
+
+  const existingRecords = await Attendance.findAll({
+    where: {
+      courseId,
+      date: attendanceDate,
+      ...(sectionId && { sectionId }),
+    },
+    include: [
+      { model: Student, include: [{ model: User, attributes: ['name'] }] },
+    ],
+  });
+
+  return success(res, 200, 'Session check complete', {
+    sessionExists: !!existingSession,
+    session: existingSession,
+    records: existingRecords,
+    recordCount: existingRecords.length,
+  });
+});
+
+// ── Get student attendance history ───────────────────────────────────────────
 const getStudentAttendance = asyncHandler(async (req, res) => {
   const { studentId } = req.params;
   const { from, to } = req.query;
@@ -165,6 +347,7 @@ const getStudentAttendance = asyncHandler(async (req, res) => {
     include: [
       { model: Class, attributes: ['name', 'section'] },
       { model: Course, attributes: ['name', 'code'] },
+      { model: Section, attributes: ['name'] },
     ],
     order: [['date', 'DESC']],
   });
@@ -182,9 +365,12 @@ const getStudentAttendance = asyncHandler(async (req, res) => {
   });
 });
 
+// ── Weekly attendance ────────────────────────────────────────────────────────
 const getWeeklyAttendance = asyncHandler(async (req, res) => {
   const { classId, startDate } = req.query;
-  if (!classId || !startDate) return error(res, 400, 'classId and startDate are required');
+  if (!classId || !startDate) {
+    return error(res, 400, 'classId and startDate are required');
+  }
 
   const start = new Date(startDate);
   const end = new Date(start);
@@ -199,6 +385,7 @@ const getWeeklyAttendance = asyncHandler(async (req, res) => {
   return success(res, 200, 'Weekly attendance fetched successfully', records);
 });
 
+// ── Monthly attendance ───────────────────────────────────────────────────────
 const getMonthlyAttendance = asyncHandler(async (req, res) => {
   const { classId, month, year } = req.query;
   if (!classId || !month || !year) {
@@ -216,16 +403,38 @@ const getMonthlyAttendance = asyncHandler(async (req, res) => {
 
   return success(res, 200, 'Monthly attendance fetched successfully', records);
 });
-// GET /api/attendance/section?sectionId=&courseId=&date=
-const getSectionAttendance = asyncHandler(async (req, res) => {
-  const { sectionId, courseId, date } = req.query;
-  if (!sectionId) return error(res, 400, 'sectionId is required');
+// GET /api/attendance/history
+const getAttendanceHistory = asyncHandler(async (req, res) => {
+  const {
+    courseId, sectionId, batchId, semesterId,
+    studentId, status, from, to,
+    page = 1, limit = 20,
+  } = req.query;
 
-  const attendanceDate = normalizeDate(date);
-  const where = { sectionId, date: attendanceDate };
+  const where = {};
   if (courseId) where.courseId = courseId;
+  if (sectionId) where.sectionId = sectionId;
+  if (batchId) where.batchId = batchId;
+  if (semesterId) where.semesterId = semesterId;
+  if (studentId) where.studentId = studentId;
+  if (status) where.status = status;
+  if (from && to) {
+    where.date = { [Op.between]: [from, to] };
+  } else if (from) {
+    where.date = { [Op.gte]: from };
+  } else if (to) {
+    where.date = { [Op.lte]: to };
+  }
 
-  const records = await Attendance.findAll({
+  // Teacher can only see their own records
+  if (req.user.role === 'TEACHER') {
+    const teacher = await Teacher.findOne({ where: { userId: req.user.id } });
+    if (teacher) where.teacherId = teacher.id;
+  }
+
+  const offset = (parseInt(page) - 1) * parseInt(limit);
+
+  const { count, rows } = await Attendance.findAndCountAll({
     where,
     include: [
       {
@@ -233,13 +442,38 @@ const getSectionAttendance = asyncHandler(async (req, res) => {
         include: [{ model: User, attributes: ['name', 'email'] }],
       },
       { model: Course, attributes: ['name', 'code'] },
+      { model: Section, attributes: ['name'] },
+      { model: Batch, attributes: ['name', 'year'] },
+      { model: Teacher, include: [{ model: User, attributes: ['name'] }] },
     ],
-    order: [['createdAt', 'ASC']],
+    order: [['date', 'DESC'], ['createdAt', 'DESC']],
+    limit: parseInt(limit),
+    offset,
+    distinct: true,
   });
 
-  return success(res, 200, 'Section attendance fetched', records);
+  // Summary stats for the filtered result
+  const allRecords = await Attendance.findAll({ where });
+  const total = allRecords.length;
+  const present = allRecords.filter((r) => r.status === 'PRESENT').length;
+  const absent = allRecords.filter((r) => r.status === 'ABSENT').length;
+  const late = allRecords.filter((r) => r.status === 'LATE').length;
+  const excused = allRecords.filter((r) => r.status === 'EXCUSED').length;
+  const percentage = total > 0 ? ((present / total) * 100).toFixed(1) : '0';
+
+  return success(res, 200, 'Attendance history fetched', {
+    records: rows,
+    pagination: {
+      total: count,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(count / parseInt(limit)),
+    },
+    summary: { total, present, absent, late, excused, percentage },
+  });
 });
 
+// ── Exports ──────────────────────────────────────────────────────────────────
 module.exports = {
   markAttendance,
   markBulkAttendance,
@@ -250,4 +484,7 @@ module.exports = {
   getStudentAttendance,
   getWeeklyAttendance,
   getMonthlyAttendance,
+  getStudentsForAttendance,
+  checkSessionAttendance,
+  getAttendanceHistory,
 };
