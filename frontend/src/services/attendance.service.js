@@ -7,11 +7,16 @@ export const attendanceService = {
   delete: (id) => api.delete(`/attendance/${id}`),
   getByClass: (classId, date) =>
     api.get('/attendance', { params: { classId, date } }),
-  getBySection: (sectionId, courseId, date) =>
-    api.get('/attendance/section', { params: { sectionId, courseId, date } }),
+  getBySection: (params) =>
+    api.get('/attendance/section', { params }),
   getByStudent: (studentId, params) =>
     api.get(`/attendance/student/${studentId}`, { params }),
+  getHistory: (params) =>
+    api.get('/attendance/history', { params }),
   getWeekly: (params) => api.get('/attendance/weekly', { params }),
   getMonthly: (params) => api.get('/attendance/monthly', { params }),
-  getSummary: (params) => api.get('/attendance/summary', { params }),
+  checkSession: (params) =>
+    api.get('/attendance/session/check', { params }),
+  getStudentsForAttendance: (params) =>
+    api.get('/attendance/section', { params }),
 };

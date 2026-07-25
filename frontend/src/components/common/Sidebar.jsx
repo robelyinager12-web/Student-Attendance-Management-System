@@ -9,6 +9,7 @@ import {
 
 const adminLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: <MdDashboard size={20} /> },
+  { to: '/course-assignments', label: 'Course Assignments', icon: <MdAssignment size={20} /> },
   { to: '/students', label: 'Students', icon: <MdPeople size={20} /> },
   { to: '/teachers', label: 'Teachers', icon: <MdSchool size={20} /> },
 
@@ -33,8 +34,9 @@ const adminLinks = [
 
 const teacherLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: <MdDashboard size={20} /> },
-  { to: '/attendance', label: 'Attendance', icon: <MdAssignment size={20} /> },
-  { to: '/students', label: 'Students', icon: <MdPeople size={20} /> },
+  { to: '/attendance', label: 'Take Attendance', icon: <MdAssignment size={20} /> },
+  { to: '/attendance/history', label: 'Attendance History', icon: <MdBarChart size={20} /> },
+  { to: '/students', label: 'My Students', icon: <MdPeople size={20} /> },
   { to: '/reports', label: 'Reports', icon: <MdBarChart size={20} /> },
   { to: '/notifications', label: 'Notifications', icon: <MdNotifications size={20} /> },
   { to: '/profile', label: 'Profile', icon: <MdPerson size={20} /> },

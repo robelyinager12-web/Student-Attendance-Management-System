@@ -2,6 +2,7 @@ import ProgramList from '../pages/programs/ProgramList';
 import BatchList from '../pages/batches/BatchList';
 import AcademicStructure from '../pages/academic/AcademicStructure';
 import SectionList from '../pages/sections/SectionList';
+import CourseAssignment from '../pages/courses/CourseAssignment';
 
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -71,6 +72,11 @@ function AppRoutes() {
 
         {/* Dashboard */}
         <Route path="/dashboard" element={<DashboardRedirect />} />
+        <Route path="/course-assignments" element={
+  <ProtectedRoute allowedRoles={['ADMIN']}>
+    <CourseAssignment />
+  </ProtectedRoute>
+} />
         <Route path="/dashboard/admin" element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <AdminDashboard />
