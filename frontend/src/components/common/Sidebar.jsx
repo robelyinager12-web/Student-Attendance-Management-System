@@ -5,7 +5,7 @@ import {
   MdLibraryBooks, MdAssignment, MdBarChart,
   MdNotifications, MdPerson, MdSettings,
   MdGroup, MdCalendarMonth, MdBook,
-  MdHistory, MdUpload,
+  MdHistory, MdSecurity,
 } from 'react-icons/md';
 
 const adminLinks = [
@@ -31,8 +31,9 @@ const adminLinks = [
   { to: '/attendance', label: 'Take Attendance', icon: <MdAssignment size={20} /> },
   { to: '/attendance/history', label: 'Attendance History', icon: <MdHistory size={20} /> },
 
-  // Reports
+  // Reports & Logs
   { to: '/reports', label: 'Reports', icon: <MdBarChart size={20} /> },
+  { to: '/audit-logs', label: 'Audit Logs', icon: <MdSecurity size={20} /> },
 
   // Other
   { to: '/notifications', label: 'Notifications', icon: <MdNotifications size={20} /> },

@@ -33,6 +33,7 @@ import AcademicStructure from '../pages/academic/AcademicStructure';
 import SectionList from '../pages/sections/SectionList';
 
 import StudentEnrollmentPage from '../pages/enrollments/StudentEnrollment';
+import AuditLog from '../pages/settings/AuditLog';
 
 import TakeAttendance from '../pages/attendance/TakeAttendance';
 import AttendanceHistory from '../pages/attendance/AttendanceHistory';
@@ -63,7 +64,7 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPassword />} />
       </Route>
 
-      {/* ── Dashboard ── */}
+      {/* ── Protected Dashboard ── */}
       <Route element={
         <ProtectedRoute>
           <DashboardLayout />
@@ -118,7 +119,7 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
-        {/* Academic structure */}
+        {/* Academic Structure */}
         <Route path="/departments" element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <DepartmentList />
@@ -176,7 +177,14 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
-        {/* Other */}
+        {/* Admin only */}
+        <Route path="/audit-logs" element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <AuditLog />
+          </ProtectedRoute>
+        } />
+
+        {/* Common */}
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/settings" element={
@@ -186,7 +194,7 @@ function AppRoutes() {
         } />
 
       </Route>
-      {/* ── End dashboard ── */}
+      {/* ── End protected routes ── */}
 
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<NotFound />} />
