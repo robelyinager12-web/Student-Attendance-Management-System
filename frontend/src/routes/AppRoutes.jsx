@@ -1,9 +1,3 @@
-import ProgramList from '../pages/programs/ProgramList';
-import BatchList from '../pages/batches/BatchList';
-import AcademicStructure from '../pages/academic/AcademicStructure';
-import SectionList from '../pages/sections/SectionList';
-import CourseAssignment from '../pages/courses/CourseAssignment';
-
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -30,7 +24,15 @@ import TeacherForm from '../pages/teachers/TeacherForm';
 
 import DepartmentList from '../pages/departments/DepartmentList';
 import CourseList from '../pages/courses/CourseList';
+import CourseAssignment from '../pages/courses/CourseAssignment';
 import ClassList from '../pages/classes/ClassList';
+
+import ProgramList from '../pages/programs/ProgramList';
+import BatchList from '../pages/batches/BatchList';
+import AcademicStructure from '../pages/academic/AcademicStructure';
+import SectionList from '../pages/sections/SectionList';
+
+import StudentEnrollmentPage from '../pages/enrollments/StudentEnrollment';
 
 import TakeAttendance from '../pages/attendance/TakeAttendance';
 import AttendanceHistory from '../pages/attendance/AttendanceHistory';
@@ -43,12 +45,10 @@ import NotFound from '../pages/NotFound';
 
 function DashboardRedirect() {
   const { user, loading } = useAuth();
-
   if (loading) return <LoadingSpinner />;
   if (user?.role === 'ADMIN') return <Navigate to="/dashboard/admin" replace />;
   if (user?.role === 'TEACHER') return <Navigate to="/dashboard/teacher" replace />;
   if (user?.role === 'STUDENT') return <Navigate to="/dashboard/student" replace />;
-
   return <Navigate to="/login" replace />;
 }
 
@@ -56,27 +56,22 @@ function AppRoutes() {
   return (
     <Routes>
 
-      {/* ── Auth routes ── */}
+      {/* ── Auth ── */}
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
       </Route>
 
-      {/* ── Protected dashboard routes ── */}
+      {/* ── Dashboard ── */}
       <Route element={
         <ProtectedRoute>
           <DashboardLayout />
         </ProtectedRoute>
       }>
 
-        {/* Dashboard */}
+        {/* Dashboards */}
         <Route path="/dashboard" element={<DashboardRedirect />} />
-        <Route path="/course-assignments" element={
-  <ProtectedRoute allowedRoles={['ADMIN']}>
-    <CourseAssignment />
-  </ProtectedRoute>
-} />
         <Route path="/dashboard/admin" element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <AdminDashboard />
@@ -92,27 +87,6 @@ function AppRoutes() {
             <StudentDashboard />
           </ProtectedRoute>
         } />
-        {/* Academic Structure */}
-<Route path="/programs" element={
-  <ProtectedRoute allowedRoles={['ADMIN']}>
-    <ProgramList />
-  </ProtectedRoute>
-} />
-<Route path="/batches" element={
-  <ProtectedRoute allowedRoles={['ADMIN']}>
-    <BatchList />
-  </ProtectedRoute>
-} />
-<Route path="/academic" element={
-  <ProtectedRoute allowedRoles={['ADMIN']}>
-    <AcademicStructure />
-  </ProtectedRoute>
-} />
-<Route path="/sections" element={
-  <ProtectedRoute allowedRoles={['ADMIN']}>
-    <SectionList />
-  </ProtectedRoute>
-} />
 
         {/* Students */}
         <Route path="/students" element={
@@ -144,10 +118,30 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
-        {/* Academic */}
+        {/* Academic structure */}
         <Route path="/departments" element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <DepartmentList />
+          </ProtectedRoute>
+        } />
+        <Route path="/programs" element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <ProgramList />
+          </ProtectedRoute>
+        } />
+        <Route path="/batches" element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <BatchList />
+          </ProtectedRoute>
+        } />
+        <Route path="/academic" element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <AcademicStructure />
+          </ProtectedRoute>
+        } />
+        <Route path="/sections" element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <SectionList />
           </ProtectedRoute>
         } />
         <Route path="/courses" element={
@@ -158,6 +152,16 @@ function AppRoutes() {
         <Route path="/classes" element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <ClassList />
+          </ProtectedRoute>
+        } />
+        <Route path="/course-assignments" element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <CourseAssignment />
+          </ProtectedRoute>
+        } />
+        <Route path="/enrollments" element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <StudentEnrollmentPage />
           </ProtectedRoute>
         } />
 
@@ -182,9 +186,8 @@ function AppRoutes() {
         } />
 
       </Route>
-      {/* ── End dashboard routes ── */}
+      {/* ── End dashboard ── */}
 
-      {/* ── Fallback routes ── */}
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<NotFound />} />
 

@@ -4,29 +4,37 @@ import {
   MdDashboard, MdPeople, MdSchool, MdClass,
   MdLibraryBooks, MdAssignment, MdBarChart,
   MdNotifications, MdPerson, MdSettings,
-  MdGroup, MdCalendarMonth,
+  MdGroup, MdCalendarMonth, MdBook,
+  MdHistory, MdUpload,
 } from 'react-icons/md';
 
 const adminLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: <MdDashboard size={20} /> },
-  { to: '/course-assignments', label: 'Course Assignments', icon: <MdAssignment size={20} /> },
+
+  // People
   { to: '/students', label: 'Students', icon: <MdPeople size={20} /> },
   { to: '/teachers', label: 'Teachers', icon: <MdSchool size={20} /> },
 
   // Academic Structure
-  { to: '/programs', label: 'Programs', icon: <MdLibraryBooks size={20} /> },
+  { to: '/departments', label: 'Departments', icon: <MdLibraryBooks size={20} /> },
+  { to: '/programs', label: 'Programs', icon: <MdBook size={20} /> },
   { to: '/batches', label: 'Batches', icon: <MdGroup size={20} /> },
   { to: '/academic', label: 'Academic Years', icon: <MdCalendarMonth size={20} /> },
   { to: '/sections', label: 'Sections', icon: <MdClass size={20} /> },
-
-  // Class & Course
-  { to: '/departments', label: 'Departments', icon: <MdLibraryBooks size={20} /> },
   { to: '/courses', label: 'Courses', icon: <MdAssignment size={20} /> },
-  { to: '/classes', label: 'Classes', icon: <MdClass size={20} /> },
 
-  // Core
-  { to: '/attendance', label: 'Attendance', icon: <MdAssignment size={20} /> },
+  // Assignments & Enrollment
+  { to: '/course-assignments', label: 'Course Assignments', icon: <MdAssignment size={20} /> },
+  { to: '/enrollments', label: 'Enrollments', icon: <MdBook size={20} /> },
+
+  // Attendance
+  { to: '/attendance', label: 'Take Attendance', icon: <MdAssignment size={20} /> },
+  { to: '/attendance/history', label: 'Attendance History', icon: <MdHistory size={20} /> },
+
+  // Reports
   { to: '/reports', label: 'Reports', icon: <MdBarChart size={20} /> },
+
+  // Other
   { to: '/notifications', label: 'Notifications', icon: <MdNotifications size={20} /> },
   { to: '/profile', label: 'Profile', icon: <MdPerson size={20} /> },
   { to: '/settings', label: 'Settings', icon: <MdSettings size={20} /> },
@@ -35,7 +43,7 @@ const adminLinks = [
 const teacherLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: <MdDashboard size={20} /> },
   { to: '/attendance', label: 'Take Attendance', icon: <MdAssignment size={20} /> },
-  { to: '/attendance/history', label: 'Attendance History', icon: <MdBarChart size={20} /> },
+  { to: '/attendance/history', label: 'Attendance History', icon: <MdHistory size={20} /> },
   { to: '/students', label: 'My Students', icon: <MdPeople size={20} /> },
   { to: '/reports', label: 'Reports', icon: <MdBarChart size={20} /> },
   { to: '/notifications', label: 'Notifications', icon: <MdNotifications size={20} /> },
@@ -44,7 +52,7 @@ const teacherLinks = [
 
 const studentLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: <MdDashboard size={20} /> },
-  { to: '/attendance', label: 'My Attendance', icon: <MdAssignment size={20} /> },
+  { to: '/attendance/history', label: 'My Attendance', icon: <MdHistory size={20} /> },
   { to: '/notifications', label: 'Notifications', icon: <MdNotifications size={20} /> },
   { to: '/profile', label: 'Profile', icon: <MdPerson size={20} /> },
 ];
@@ -64,19 +72,22 @@ function Sidebar({ isOpen }) {
       z-40 transform transition-transform duration-300
       ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
 
+      {/* Logo */}
       <div className="flex items-center justify-center h-16
-        border-b border-indigo-700">
+        border-b border-indigo-700 shrink-0">
         <span className="text-xl font-bold tracking-wide">📚 SAMS</span>
       </div>
 
-      <nav className="flex flex-col gap-1 p-4
+      {/* Navigation */}
+      <nav className="flex flex-col gap-0.5 p-3
         overflow-y-auto h-[calc(100vh-64px)]">
         {links.map((link) => (
           <NavLink
             key={link.to}
             to={link.to}
+            end={link.to === '/dashboard'}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm
+              `flex items-center gap-3 px-3 py-2 rounded-lg text-sm
               font-medium transition-colors
               ${isActive
                 ? 'bg-indigo-600 text-white'
