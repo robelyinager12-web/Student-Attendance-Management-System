@@ -4,23 +4,19 @@ import api from '../services/api';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
     if (token) {
       api.get('/auth/me')
-        .then((res) => {
-          setUser(res.data.data);
-        })
+        .then((res) => setUser(res.data.data))
         .catch(() => {
           localStorage.removeItem('accessToken');
           setUser(null);
         })
-        .finally(() => {
-          setLoading(false);
-        });
+        .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
@@ -29,21 +25,16 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
     const { accessToken, user } = res.data.data;
-
     localStorage.setItem('accessToken', accessToken);
     setUser(user);
-
     return user;
   };
 
   const logout = async () => {
-    try {
-      await api.post('/auth/logout');
-    } catch (err) {
-      // continue even if logout API fails
-    }
+    try { await api.post('/auth/logout'); } catch (_) {}
     localStorage.removeItem('accessToken');
     setUser(null);
+    window.location.href = '/login';
   };
 
   return (

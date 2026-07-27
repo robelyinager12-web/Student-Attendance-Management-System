@@ -14,23 +14,15 @@ function Login() {
     formState: { errors, isSubmitting },
   } = useForm();
 
-  const onSubmit = async (data) => {
+const onSubmit = async (data) => {
   try {
     const loggedInUser = await login(data.email, data.password);
-
     toast.success(`Welcome back, ${loggedInUser.name}!`);
-
-    // Force redirect based on role
-    if (loggedInUser.role === 'ADMIN') {
-      window.location.href = '/dashboard/admin';
-    } else if (loggedInUser.role === 'TEACHER') {
-      window.location.href = '/dashboard/teacher';
-    } else {
-      window.location.href = '/dashboard/student';
-    }
+    window.location.href = '/home';
   } catch (err) {
-    console.error('Login error:', err);
-    toast.error(err.response?.data?.message || 'Login failed. Check your email and password.');
+    toast.error(
+      err.response?.data?.message || 'Login failed. Check your credentials.'
+    );
   }
 };
 

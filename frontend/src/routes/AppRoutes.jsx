@@ -1,4 +1,3 @@
-import HomePage from '../pages/home/HomePage';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -7,50 +6,54 @@ import AuthLayout from '../layouts/AuthLayout';
 import DashboardLayout from '../layouts/DashboardLayout';
 import ProtectedRoute from '../components/common/ProtectedRoute';
 
+// Auth
 import Login from '../pages/auth/Login';
 import ForgotPassword from '../pages/auth/ForgotPassword';
 import ResetPassword from '../pages/auth/ResetPassword';
 
-import AdminDashboard from '../pages/dashboard/AdminDashboard';
-import TeacherDashboard from '../pages/dashboard/TeacherDashboard';
-import StudentDashboard from '../pages/dashboard/StudentDashboard';
+// Role-based home page
+import HomePage from '../pages/home/HomePage';
 
+// Students
 import StudentList from '../pages/students/StudentList';
 import StudentForm from '../pages/students/StudentForm';
 import StudentProfile from '../pages/students/StudentProfile';
 import ImportStudents from '../pages/students/ImportStudents';
 
+// Teachers
 import TeacherList from '../pages/teachers/TeacherList';
 import TeacherForm from '../pages/teachers/TeacherForm';
 
+// Academic
 import DepartmentList from '../pages/departments/DepartmentList';
 import CourseList from '../pages/courses/CourseList';
 import CourseAssignment from '../pages/courses/CourseAssignment';
 import ClassList from '../pages/classes/ClassList';
-
 import ProgramList from '../pages/programs/ProgramList';
 import BatchList from '../pages/batches/BatchList';
 import AcademicStructure from '../pages/academic/AcademicStructure';
 import SectionList from '../pages/sections/SectionList';
 
+// Enrollments & Audit
 import StudentEnrollmentPage from '../pages/enrollments/StudentEnrollment';
 import AuditLog from '../pages/settings/AuditLog';
 
+// Attendance
 import TakeAttendance from '../pages/attendance/TakeAttendance';
 import AttendanceHistory from '../pages/attendance/AttendanceHistory';
 
+// Other
 import Reports from '../pages/reports/Reports';
 import Profile from '../pages/profile/Profile';
 import Settings from '../pages/profile/Settings';
 import Notifications from '../pages/notifications/Notifications';
 import NotFound from '../pages/NotFound';
 
-function DashboardRedirect() {
+// ── After login, redirect to /home ──────────────────────────────────────────
+function RootRedirect() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingSpinner />;
-  if (user?.role === 'ADMIN') return <Navigate to="/dashboard/admin" replace />;
-  if (user?.role === 'TEACHER') return <Navigate to="/dashboard/teacher" replace />;
-  if (user?.role === 'STUDENT') return <Navigate to="/dashboard/student" replace />;
+  if (user) return <Navigate to="/home" replace />;
   return <Navigate to="/login" replace />;
 }
 
@@ -58,37 +61,27 @@ function AppRoutes() {
   return (
     <Routes>
 
-      {/* ── Auth ── */}
+      {/* ── Auth routes ── */}
       <Route element={<AuthLayout />}>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login"           element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/reset-password"  element={<ResetPassword />} />
       </Route>
 
-      {/* ── Protected Dashboard ── */}
+      {/* ── Protected routes (inside DashboardLayout) ── */}
       <Route element={
         <ProtectedRoute>
           <DashboardLayout />
         </ProtectedRoute>
       }>
+        {/* ✅ Single home route — all roles */}
+        <Route path="/home" element={<HomePage />} />
 
-        {/* Dashboards */}
-        <Route path="/dashboard" element={<DashboardRedirect />} />
-        <Route path="/dashboard/admin" element={
-          <ProtectedRoute allowedRoles={['ADMIN']}>
-            <AdminDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/dashboard/teacher" element={
-          <ProtectedRoute allowedRoles={['TEACHER']}>
-            <TeacherDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/dashboard/student" element={
-          <ProtectedRoute allowedRoles={['STUDENT']}>
-            <StudentDashboard />
-          </ProtectedRoute>
-        } />
+        {/* Legacy redirects */}
+        <Route path="/dashboard"         element={<Navigate to="/home" replace />} />
+        <Route path="/dashboard/admin"   element={<Navigate to="/home" replace />} />
+        <Route path="/dashboard/teacher" element={<Navigate to="/home" replace />} />
+        <Route path="/dashboard/student" element={<Navigate to="/home" replace />} />
 
         {/* Students */}
         <Route path="/students" element={
@@ -120,7 +113,7 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
-        {/* Academic Structure */}
+        {/* Academic */}
         <Route path="/departments" element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <DepartmentList />
@@ -168,7 +161,7 @@ function AppRoutes() {
         } />
 
         {/* Attendance */}
-        <Route path="/attendance" element={<TakeAttendance />} />
+        <Route path="/attendance"         element={<TakeAttendance />} />
         <Route path="/attendance/history" element={<AttendanceHistory />} />
 
         {/* Reports */}
@@ -184,39 +177,22 @@ function AppRoutes() {
             <AuditLog />
           </ProtectedRoute>
         } />
-
-        {/* Common */}
-        <Route path="/notifications" element={<Notifications />} />
-        <Route path="/profile" element={<Profile />} />
         <Route path="/settings" element={
           <ProtectedRoute allowedRoles={['ADMIN']}>
             <Settings />
           </ProtectedRoute>
         } />
-        {/* ── Home / Dashboard (role-based) ── */}
-<Route path="/dashboard" element={<DashboardRedirect />} />
 
-<Route path="/dashboard/admin" element={
-  <ProtectedRoute allowedRoles={['ADMIN']}>
-    <HomePage />
-  </ProtectedRoute>
-} />
-<Route path="/dashboard/teacher" element={
-  <ProtectedRoute allowedRoles={['TEACHER']}>
-    <HomePage />
-  </ProtectedRoute>
-} />
-<Route path="/dashboard/student" element={
-  <ProtectedRoute allowedRoles={['STUDENT']}>
-    <HomePage />
-  </ProtectedRoute>
-} />
+        {/* Common */}
+        <Route path="/notifications" element={<Notifications />} />
+        <Route path="/profile"       element={<Profile />} />
 
       </Route>
       {/* ── End protected routes ── */}
 
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="*" element={<NotFound />} />
+      {/* Fallback */}
+      <Route path="/"  element={<RootRedirect />} />
+      <Route path="*"  element={<NotFound />} />
 
     </Routes>
   );
