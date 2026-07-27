@@ -1,3 +1,4 @@
+import HomePage from '../pages/home/HomePage';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -192,6 +193,24 @@ function AppRoutes() {
             <Settings />
           </ProtectedRoute>
         } />
+        {/* ── Home / Dashboard (role-based) ── */}
+<Route path="/dashboard" element={<DashboardRedirect />} />
+
+<Route path="/dashboard/admin" element={
+  <ProtectedRoute allowedRoles={['ADMIN']}>
+    <HomePage />
+  </ProtectedRoute>
+} />
+<Route path="/dashboard/teacher" element={
+  <ProtectedRoute allowedRoles={['TEACHER']}>
+    <HomePage />
+  </ProtectedRoute>
+} />
+<Route path="/dashboard/student" element={
+  <ProtectedRoute allowedRoles={['STUDENT']}>
+    <HomePage />
+  </ProtectedRoute>
+} />
 
       </Route>
       {/* ── End protected routes ── */}
