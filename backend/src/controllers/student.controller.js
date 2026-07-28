@@ -72,38 +72,61 @@ const createStudent = asyncHandler(async (req, res) => {
 });
 
 const getStudents = asyncHandler(async (req, res) => {
-  const { departmentId, courseId, classId, status, search } = req.query;
-  const { page, limit, offset } = getPagination(req.query);
+  const {
+    search, departmentId, courseId, classId,
+    sectionId, batchId, academicYearId, semesterId,
+    year, status, page = 1, limit = 20,
+  } = req.query;
 
   const where = {};
-  if (departmentId) where.departmentId = departmentId;
-  if (courseId) where.courseId = courseId;
-  if (classId) where.classId = classId;
-  if (status) where.status = status;
+  if (departmentId)   where.departmentId   = departmentId;
+  if (courseId)       where.courseId       = courseId;
+  if (classId)        where.classId        = classId;
+  if (sectionId)      where.sectionId      = sectionId;
+  if (batchId)        where.batchId        = batchId;
+  if (academicYearId) where.academicYearId = academicYearId;
+  if (semesterId)     where.semesterId     = semesterId;
+  if (year)           where.year           = year;
+  if (status)         where.status         = status;
 
   const userWhere = {};
   if (search) {
+    const { Op } = require('sequelize');
     userWhere[Op.or] = [
-      { name: { [Op.iLike]: `%${search}%` } },
+      { name:  { [Op.iLike]: `%${search}%` } },
       { email: { [Op.iLike]: `%${search}%` } },
+    ];
+    where[Op.or] = [
+      { studentCode: { [Op.iLike]: `%${search}%` } },
     ];
   }
 
-  const result = await Student.findAndCountAll({
+  const offset = (parseInt(page) - 1) * parseInt(limit);
+
+  const { count, rows } = await Student.findAndCountAll({
     where,
     include: [
-      { model: User, attributes: ['id', 'name', 'email', 'profileImage', 'isActive'], where: userWhere },
-      { model: Department, attributes: ['id', 'name', 'code'] },
-      { model: Course, attributes: ['id', 'name', 'code'] },
-      { model: Class, attributes: ['id', 'name', 'section'] },
+      { model: User,         where: Object.keys(userWhere).length ? userWhere : undefined, attributes: ['name', 'email'] },
+      { model: Department,   attributes: ['id', 'name', 'code'] },
+      { model: Course,       attributes: ['id', 'name', 'code'] },
+      { model: Class,        attributes: ['id', 'name'] },
+      { model: Section,      attributes: ['id', 'name'] },
+      { model: Batch,        attributes: ['id', 'name', 'year'] },
+      { model: AcademicYear, attributes: ['id', 'name', 'year'] },
+      { model: Semester,     attributes: ['id', 'name', 'number'] },
     ],
-    limit,
+    order: [[User, 'name', 'ASC']],
+    limit: parseInt(limit),
     offset,
-    order: [['studentCode', 'ASC']],
     distinct: true,
   });
 
-  return success(res, 200, 'Students fetched successfully', buildPaginatedResponse(result, page, limit));
+  return success(res, 200, 'Students fetched successfully', {
+    items: rows,
+    total: count,
+    page: parseInt(page),
+    totalPages: Math.ceil(count / parseInt(limit)),
+  });
 });
 
 const getStudentById = asyncHandler(async (req, res) => {
