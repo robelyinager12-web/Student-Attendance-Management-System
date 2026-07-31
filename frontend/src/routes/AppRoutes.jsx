@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import LandingPage from '../pages/landing/LandingPage';
 
 import AuthLayout from '../layouts/AuthLayout';
 import DashboardLayout from '../layouts/DashboardLayout';
@@ -190,10 +191,9 @@ function AppRoutes() {
       </Route>
       {/* ── End protected routes ── */}
 
-      {/* Fallback */}
-      <Route path="/"  element={<RootRedirect />} />
-      <Route path="*"  element={<NotFound />} />
-
+    {/* ── Root → Landing page ── */}
+<Route path="/" element={<LandingPage />} />
+<Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
