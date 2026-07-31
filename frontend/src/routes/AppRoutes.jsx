@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import LandingPage from '../pages/landing/LandingPage';
+import Register from '../pages/auth/Register';
 
 import AuthLayout from '../layouts/AuthLayout';
 import DashboardLayout from '../layouts/DashboardLayout';
@@ -64,10 +64,13 @@ function AppRoutes() {
 
       {/* ── Auth routes ── */}
       <Route element={<AuthLayout />}>
-        <Route path="/login"           element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password"  element={<ResetPassword />} />
-      </Route>
+  <Route path="/login"           element={<Login />} />
+  <Route path="/forgot-password" element={<ForgotPassword />} />
+  <Route path="/reset-password"  element={<ResetPassword />} />
+  <Route path="/register"        element={<Register />} />
+  <Route path="/register/:role"  element={<Register />} />
+</Route>
+      
 
       {/* ── Protected routes (inside DashboardLayout) ── */}
       <Route element={
@@ -192,8 +195,7 @@ function AppRoutes() {
       {/* ── End protected routes ── */}
 
     {/* ── Root → Landing page ── */}
-<Route path="/" element={<LandingPage />} />
-<Route path="*" element={<NotFound />} />
+<Route path="/" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
