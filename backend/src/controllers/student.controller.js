@@ -5,7 +5,14 @@ const { Op } = require('sequelize');
 const asyncHandler = require('../utils/asyncHandler');
 const { success, error } = require('../utils/apiResponse');
 const { getPagination, buildPaginatedResponse } = require('../utils/pagination.utils');
-const { Student, User, Department, Course, Class, Enrollment, Attendance } = require('../models');
+const {
+  Student, User, Department, Program,
+  Batch, AcademicYear, Semester, Section,
+  Course, Class, Attendance,
+} = require('../models');
+const asyncHandler  = require('../middlewares/asyncHandler.middleware');
+const { success, error } = require('../utils/response.util');
+const auditLog      = require('../services/auditLog.service');
 
 async function generateStudentCode() {
   const count = await Student.count();
@@ -73,60 +80,124 @@ const createStudent = asyncHandler(async (req, res) => {
 
 const getStudents = asyncHandler(async (req, res) => {
   const {
-    search, departmentId, courseId, classId,
-    sectionId, batchId, academicYearId, semesterId,
-    year, status, page = 1, limit = 20,
+    search, departmentId, sectionId, batchId,
+    academicYearId, semesterId, year, status,
+    courseId, classId,
+    page = 1, limit = 20,
   } = req.query;
 
-  const where = {};
-  if (departmentId)   where.departmentId   = departmentId;
-  if (courseId)       where.courseId       = courseId;
-  if (classId)        where.classId        = classId;
-  if (sectionId)      where.sectionId      = sectionId;
-  if (batchId)        where.batchId        = batchId;
-  if (academicYearId) where.academicYearId = academicYearId;
-  if (semesterId)     where.semesterId     = semesterId;
-  if (year)           where.year           = year;
-  if (status)         where.status         = status;
+  const { Op } = require('sequelize');
 
+  // ── Student-level filters ──────────────────────────────────────────────────
+  const studentWhere = {};
+  if (departmentId)   studentWhere.departmentId   = departmentId;
+  if (sectionId)      studentWhere.sectionId      = sectionId;
+  if (batchId)        studentWhere.batchId        = batchId;
+  if (academicYearId) studentWhere.academicYearId = academicYearId;
+  if (semesterId)     studentWhere.semesterId     = semesterId;
+  if (courseId)       studentWhere.courseId       = courseId;
+  if (classId)        studentWhere.classId        = classId;
+  if (year)           studentWhere.year           = parseInt(year);
+  if (status)         studentWhere.status         = status.toUpperCase();
+
+  // Search on studentCode directly
+  if (search) {
+    studentWhere[Op.or] = [
+      { studentCode: { [Op.iLike]: `%${search}%` } },
+    ];
+  }
+
+  // ── User-level filters ─────────────────────────────────────────────────────
   const userWhere = {};
   if (search) {
-    const { Op } = require('sequelize');
     userWhere[Op.or] = [
       { name:  { [Op.iLike]: `%${search}%` } },
       { email: { [Op.iLike]: `%${search}%` } },
-    ];
-    where[Op.or] = [
-      { studentCode: { [Op.iLike]: `%${search}%` } },
     ];
   }
 
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
-  const { count, rows } = await Student.findAndCountAll({
-    where,
-    include: [
-      { model: User,         where: Object.keys(userWhere).length ? userWhere : undefined, attributes: ['name', 'email'] },
-      { model: Department,   attributes: ['id', 'name', 'code'] },
-      { model: Course,       attributes: ['id', 'name', 'code'] },
-      { model: Class,        attributes: ['id', 'name'] },
-      { model: Section,      attributes: ['id', 'name'] },
-      { model: Batch,        attributes: ['id', 'name', 'year'] },
-      { model: AcademicYear, attributes: ['id', 'name', 'year'] },
-      { model: Semester,     attributes: ['id', 'name', 'number'] },
-    ],
-    order: [[User, 'name', 'ASC']],
-    limit: parseInt(limit),
-    offset,
-    distinct: true,
-  });
+  // ── Build includes ─────────────────────────────────────────────────────────
+  // User is required — every student has a user account
+  const userInclude = {
+    model:      User,
+    attributes: ['id', 'name', 'email', 'phone'],
+    required:   true,
+  };
 
-  return success(res, 200, 'Students fetched successfully', {
-    items: rows,
-    total: count,
-    page: parseInt(page),
-    totalPages: Math.ceil(count / parseInt(limit)),
-  });
+  // If searching by name/email, add where to user include
+  if (Object.keys(userWhere).length > 0) {
+    // Merge student code OR with user OR
+    if (search) {
+      // Use a top-level OR combining studentCode and user name/email
+      studentWhere[Op.or] = [
+        { studentCode: { [Op.iLike]: `%${search}%` } },
+        { '$User.name$':  { [Op.iLike]: `%${search}%` } },
+        { '$User.email$': { [Op.iLike]: `%${search}%` } },
+      ];
+    }
+  }
+
+  try {
+    const { count, rows } = await Student.findAndCountAll({
+      where:   studentWhere,
+      include: [
+        {
+          model:      User,
+          attributes: ['id', 'name', 'email', 'phone'],
+          required:   true,
+        },
+        {
+          model:      Department,
+          attributes: ['id', 'name', 'code'],
+          required:   false,
+        },
+        {
+          model:      Program,
+          attributes: ['id', 'name', 'code'],
+          required:   false,
+        },
+        {
+          model:      Batch,
+          attributes: ['id', 'name', 'year'],
+          required:   false,
+        },
+        {
+          model:      AcademicYear,
+          attributes: ['id', 'name', 'year'],
+          required:   false,
+        },
+        {
+          model:      Semester,
+          attributes: ['id', 'name', 'number'],
+          required:   false,
+        },
+        {
+          model:      Section,
+          attributes: ['id', 'name'],
+          required:   false,
+        },
+      ],
+      order:    [[User, 'name', 'ASC']],
+      limit:    parseInt(limit),
+      offset,
+      distinct: true,
+      subQuery: false,   // ← critical: prevents count issues with search
+    });
+
+    return success(res, 200, 'Students fetched successfully', {
+      items:      rows,
+      total:      count,
+      page:       parseInt(page),
+      totalPages: Math.ceil(count / parseInt(limit)),
+    });
+
+  } catch (err) {
+    console.error('getStudents DB error:', err.message);
+    console.error(err.stack);
+    return error(res, 500, `Failed to fetch students: ${err.message}`);
+  }
 });
 
 const getStudentById = asyncHandler(async (req, res) => {

@@ -92,23 +92,38 @@ export default function StudentList() {
   }, [filters.batchId]);
 
   // ── Fetch students ──
-  const fetchStudents = useCallback(async (pg = page) => {
-    setLoading(true);
-    setSelected([]);
-    try {
-      const params = { page: pg, limit: 20 };
-      Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
-      const res = await studentService.getAll(params);
-      const data = res.data.data;
+ const fetchStudents = useCallback(async (pg = 1) => {
+  setLoading(true);
+  setSelected([]);
+  try {
+    // Only send non-empty filters
+    const params = { page: pg, limit: 20 };
+    Object.entries(filters).forEach(([k, v]) => {
+      if (v !== '' && v !== null && v !== undefined) params[k] = v;
+    });
+
+    const res = await studentService.getAll(params);
+    const data = res.data.data;
+
+    // Handle both array and paginated response
+    if (Array.isArray(data)) {
+      setStudents(data);
+      setTotal(data.length);
+      setTotalPages(1);
+    } else {
       setStudents(data.items || []);
       setTotal(data.total || 0);
       setTotalPages(data.totalPages || 1);
-    } catch {
-      toast.error('Failed to load students');
-    } finally {
-      setLoading(false);
     }
-  }, [filters, page]);
+  } catch (err) {
+    console.error('fetchStudents error:', err.response?.data || err.message);
+    toast.error(err.response?.data?.message || 'Failed to load students');
+    setStudents([]);
+    setTotal(0);
+  } finally {
+    setLoading(false);
+  }
+}, [filters]);
 
   useEffect(() => { fetchStudents(1); setPage(1); }, [filters]);
 
