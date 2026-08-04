@@ -1,232 +1,348 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { studentService } from '../../services/student.service';
 import { departmentService } from '../../services/department.service';
-import { courseService } from '../../services/course.service';
-import { classService } from '../../services/class.service';
 import Breadcrumb from '../../components/common/Breadcrumb';
-import { emailRules, nameRules, passwordRules } from '../../utils/validators';
+import api from '../../services/api';
+import { MdSave, MdArrowBack } from 'react-icons/md';
 
-function StudentForm() {
-  const navigate = useNavigate();
-  const [departments, setDepartments] = useState([]);
-  const [courses, setCourses] = useState([]);
-  const [classes, setClasses] = useState([]);
+const inputClass = `w-full px-4 py-2.5 rounded-xl border-2 border-gray-200
+  dark:border-gray-600 focus:border-indigo-500 focus:outline-none
+  bg-gray-50 dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-700
+  text-sm text-gray-700 dark:text-gray-200 transition-all
+  disabled:opacity-50 disabled:cursor-not-allowed`;
+
+const selectClass = `w-full px-4 py-2.5 rounded-xl border-2 border-gray-200
+  dark:border-gray-600 focus:border-indigo-500 focus:outline-none
+  bg-gray-50 dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-200
+  transition-all disabled:opacity-50 disabled:cursor-not-allowed`;
+
+const YEAR_LABELS = ['I','II','III','IV','V'];
+
+export default function StudentForm() {
+  const { id }     = useParams();
+  const navigate   = useNavigate();
+  const isEdit     = Boolean(id);
+
+  const [departments,   setDepartments]   = useState([]);
+  const [programs,      setPrograms]      = useState([]);
+  const [batches,       setBatches]       = useState([]);
+  const [sections,      setSections]      = useState([]);
+  const [semesters,     setSemesters]     = useState([]);
+  const [academicYears, setAcademicYears] = useState([]);
+  const [loadingData,   setLoadingData]   = useState(isEdit);
 
   const {
-    register,
-    handleSubmit,
+    register, handleSubmit, reset, watch,
     formState: { errors, isSubmitting },
   } = useForm();
 
+  const selectedDept  = watch('departmentId');
+  const selectedBatch = watch('batchId');
+
+  // Load departments and academic years once
   useEffect(() => {
-    departmentService.getAll().then((r) => setDepartments(r.data.data)).catch(() => {});
-    courseService.getAll().then((r) => setCourses(r.data.data)).catch(() => {});
-    classService.getAll().then((r) => setClasses(r.data.data)).catch(() => {});
+    departmentService.getAll().then(r => setDepartments(r.data.data)).catch(() => {});
+    api.get('/academic-years').then(r => setAcademicYears(r.data.data)).catch(() => {});
   }, []);
+
+  // Load programs + batches when dept changes
+  useEffect(() => {
+    if (!selectedDept) { setPrograms([]); setBatches([]); return; }
+    api.get(`/programs?departmentId=${selectedDept}`).then(r => setPrograms(r.data.data)).catch(() => {});
+    api.get(`/batches?departmentId=${selectedDept}`).then(r => setBatches(r.data.data)).catch(() => {});
+  }, [selectedDept]);
+
+  // Load sections + semesters when batch changes
+  useEffect(() => {
+    if (!selectedBatch) { setSections([]); setSemesters([]); return; }
+    api.get(`/sections?batchId=${selectedBatch}`).then(r => setSections(r.data.data)).catch(() => {});
+    api.get(`/academic-years?batchId=${selectedBatch}`).then(r => {
+      const cur = r.data.data.find(ay => ay.isCurrent) || r.data.data[0];
+      if (cur) api.get(`/semesters?academicYearId=${cur.id}`).then(s => setSemesters(s.data.data)).catch(() => {});
+    }).catch(() => {});
+  }, [selectedBatch]);
+
+  // Load existing data for edit
+  useEffect(() => {
+    if (!isEdit) return;
+    studentService.getById(id).then(r => {
+      const s = r.data.data;
+      reset({
+        name:           s.User?.name        || '',
+        email:          s.User?.email       || '',
+        studentCode:    s.studentCode       || '',
+        gender:         s.gender            || '',
+        year:           s.year              || '',
+        status:         s.status            || 'ACTIVE',
+        departmentId:   s.departmentId      || '',
+        programId:      s.programId         || '',
+        batchId:        s.batchId           || '',
+        academicYearId: s.academicYearId    || '',
+        semesterId:     s.semesterId        || '',
+        sectionId:      s.sectionId         || '',
+      });
+    }).catch(() => toast.error('Failed to load student data'))
+      .finally(() => setLoadingData(false));
+  }, [id, isEdit, reset]);
 
   const onSubmit = async (data) => {
     try {
-      await studentService.create(data);
-      toast.success('Student created successfully');
+      if (isEdit) {
+        await studentService.update(id, {
+          studentCode:    data.studentCode    || undefined,
+          gender:         data.gender         || undefined,
+          year:           data.year           ? parseInt(data.year) : undefined,
+          status:         data.status,
+          departmentId:   data.departmentId   || undefined,
+          programId:      data.programId      || undefined,
+          batchId:        data.batchId        || undefined,
+          academicYearId: data.academicYearId || undefined,
+          semesterId:     data.semesterId     || undefined,
+          sectionId:      data.sectionId      || undefined,
+        });
+        toast.success('Student updated successfully');
+      } else {
+        // Create new — first create User, then Student
+        await api.post('/auth/register', {
+          name:     data.name,
+          email:    data.email,
+          password: data.password || 'password123',
+          role:     'STUDENT',
+        }).then(async r => {
+          const userId = r.data.data.id;
+          await api.post('/students', {
+            userId,
+            studentCode:    data.studentCode    || undefined,
+            gender:         data.gender         || undefined,
+            year:           data.year           ? parseInt(data.year) : undefined,
+            status:         data.status         || 'ACTIVE',
+            departmentId:   data.departmentId   || undefined,
+            programId:      data.programId      || undefined,
+            batchId:        data.batchId        || undefined,
+            academicYearId: data.academicYearId || undefined,
+            semesterId:     data.semesterId     || undefined,
+            sectionId:      data.sectionId      || undefined,
+          });
+        });
+        toast.success('Student created successfully');
+      }
       navigate('/students');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create student');
+      toast.error(err.response?.data?.message || 'Failed to save student');
     }
   };
 
-  const inputClass = `w-full px-4 py-2.5 rounded-lg border border-gray-200
-    dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700
-    dark:text-gray-200 text-sm focus:outline-none focus:ring-2
-    focus:ring-indigo-500`;
-
-  const labelClass = `block text-sm font-medium text-gray-700
-    dark:text-gray-300 mb-1`;
+  if (loadingData) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   return (
     <div className="space-y-5 max-w-3xl">
       <Breadcrumb items={[
-        { label: 'Dashboard', href: '/dashboard' },
-        { label: 'Students', href: '/students' },
-        { label: 'Add Student' },
+        { label: 'Dashboard', href: '/home' },
+        { label: 'Students',  href: '/students' },
+        { label: isEdit ? 'Edit Student' : 'Add Student' },
       ]} />
 
-      <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
-        Add New Student
-      </h1>
-
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="bg-white dark:bg-gray-800 rounded-xl border
-          border-gray-100 dark:border-gray-700 p-6 space-y-6"
-      >
-        {/* Section — Account Info */}
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-indigo-600 uppercase
-            tracking-wider mb-4">
-            Account Information
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Full Name *</label>
-              <input {...register('name', nameRules)} className={inputClass} />
-              {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
-            </div>
-            <div>
-              <label className={labelClass}>Email *</label>
-              <input type="email" {...register('email', emailRules)} className={inputClass} />
-              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
-            </div>
-            <div>
-              <label className={labelClass}>Password *</label>
-              <input type="password" {...register('password', passwordRules)} className={inputClass} />
-              {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
-            </div>
-            <div>
-              <label className={labelClass}>Phone</label>
-              <input {...register('phone')} className={inputClass} placeholder="09xxxxxxxx" />
+          <h1 className="text-2xl font-extrabold text-gray-800 dark:text-white">
+            {isEdit ? 'Edit Student' : 'Add New Student'}
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">
+            {isEdit ? 'Update student information' : 'Create a new student account'}
+          </p>
+        </div>
+        <button onClick={() => navigate('/students')}
+          className="flex items-center gap-2 text-sm text-gray-500
+            hover:text-gray-700 font-semibold">
+          <MdArrowBack size={18} /> Back
+        </button>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit(onSubmit)}
+        className="bg-white dark:bg-gray-800 rounded-2xl border
+          border-gray-100 dark:border-gray-700 shadow-sm p-6 space-y-6">
+
+        {/* ── Account Info ── */}
+        {!isEdit && (
+          <div>
+            <h2 className="text-sm font-bold text-indigo-600 uppercase
+              tracking-wider mb-4 flex items-center gap-2">
+              <span className="w-1 h-5 rounded-full bg-indigo-500 inline-block" />
+              Account Information
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500
+                  uppercase tracking-wider mb-1">Full Name *</label>
+                <input {...register('name', { required: 'Name is required' })}
+                  placeholder="e.g. Abel Bekele Tadesse"
+                  className={inputClass} />
+                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500
+                  uppercase tracking-wider mb-1">Email *</label>
+                <input type="email"
+                  {...register('email', { required: 'Email is required' })}
+                  placeholder="student@injibara.edu.et"
+                  className={inputClass} />
+                {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500
+                  uppercase tracking-wider mb-1">Password</label>
+                <input type="password" {...register('password')}
+                  placeholder="Leave empty for default: password123"
+                  className={inputClass} />
+                <p className="text-xs text-gray-400 mt-1">
+                  Default password: <code className="bg-gray-100 px-1 rounded">password123</code>
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Section — Personal Info */}
+        {/* ── Student Info ── */}
         <div>
-          <h2 className="text-sm font-semibold text-indigo-600 uppercase
-            tracking-wider mb-4">
-            Personal Information
+          <h2 className="text-sm font-bold text-indigo-600 uppercase
+            tracking-wider mb-4 flex items-center gap-2">
+            <span className="w-1 h-5 rounded-full bg-indigo-500 inline-block" />
+            Student Information
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Gender</label>
-              <select {...register('gender')} className={inputClass}>
+              <label className="block text-xs font-bold text-gray-500
+                uppercase tracking-wider mb-1">Student ID / Code</label>
+              <input {...register('studentCode')}
+                placeholder="e.g. INU1501051"
+                className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500
+                uppercase tracking-wider mb-1">Gender</label>
+              <select {...register('gender')} className={selectClass}>
                 <option value="">Select gender</option>
                 <option value="MALE">Male</option>
                 <option value="FEMALE">Female</option>
-                <option value="OTHER">Other</option>
               </select>
             </div>
             <div>
-              <label className={labelClass}>Date of Birth</label>
-              <input type="date" {...register('dateOfBirth')} className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Address</label>
-              <input {...register('address')} className={inputClass} placeholder="City, Region" />
-            </div>
-            <div>
-              <label className={labelClass}>Admission Date</label>
-              <input type="date" {...register('admissionDate')} className={inputClass} />
+              <label className="block text-xs font-bold text-gray-500
+                uppercase tracking-wider mb-1">Status</label>
+              <select {...register('status')} className={selectClass}>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+                <option value="GRADUATED">Graduated</option>
+                <option value="SUSPENDED">Suspended</option>
+              </select>
             </div>
           </div>
         </div>
 
-        {/* Section — Academic Info */}
+        {/* ── Academic Placement ── */}
         <div>
-          <h2 className="text-sm font-semibold text-indigo-600 uppercase
-            tracking-wider mb-4">
-            Academic Information
+          <h2 className="text-sm font-bold text-indigo-600 uppercase
+            tracking-wider mb-4 flex items-center gap-2">
+            <span className="w-1 h-5 rounded-full bg-cyan-500 inline-block" />
+            Academic Placement
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Department</label>
-              <select {...register('departmentId')} className={inputClass}>
+              <label className="block text-xs font-bold text-gray-500
+                uppercase tracking-wider mb-1">Department</label>
+              <select {...register('departmentId')} className={selectClass}>
                 <option value="">Select department</option>
-                {departments.map((d) => (
+                {departments.map(d => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className={labelClass}>Course</label>
-              <select {...register('courseId')} className={inputClass}>
-                <option value="">Select course</option>
-                {courses.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+              <label className="block text-xs font-bold text-gray-500
+                uppercase tracking-wider mb-1">Program</label>
+              <select {...register('programId')} className={selectClass}
+                disabled={!selectedDept}>
+                <option value="">Select program</option>
+                {programs.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className={labelClass}>Class *</label>
-              <select
-                {...register('classId', { required: 'Class is required' })}
-                className={inputClass}
-              >
-                <option value="">Select class</option>
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.section ? `— Section ${c.section}` : ''}
-                  </option>
+              <label className="block text-xs font-bold text-gray-500
+                uppercase tracking-wider mb-1">Batch</label>
+              <select {...register('batchId')} className={selectClass}
+                disabled={!selectedDept}>
+                <option value="">Select batch</option>
+                {batches.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
-              {errors.classId && (
-                <p className="text-red-500 text-xs mt-1">{errors.classId.message}</p>
-              )}
             </div>
             <div>
-              <label className={labelClass}>Year</label>
-              <select {...register('year')} className={inputClass}>
+              <label className="block text-xs font-bold text-gray-500
+                uppercase tracking-wider mb-1">Year Level</label>
+              <select {...register('year')} className={selectClass}>
                 <option value="">Select year</option>
-                <option value="1">Year 1</option>
-                <option value="2">Year 2</option>
-                <option value="3">Year 3</option>
-                <option value="4">Year 4</option>
+                {YEAR_LABELS.map((y, i) => (
+                  <option key={i+1} value={i+1}>Year {y}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label className={labelClass}>Semester</label>
-              <select {...register('semester')} className={inputClass}>
+              <label className="block text-xs font-bold text-gray-500
+                uppercase tracking-wider mb-1">Semester</label>
+              <select {...register('semesterId')} className={selectClass}
+                disabled={!selectedBatch}>
                 <option value="">Select semester</option>
-                <option value="1">Semester 1</option>
-                <option value="2">Semester 2</option>
+                {semesters.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500
+                uppercase tracking-wider mb-1">Section</label>
+              <select {...register('sectionId')} className={selectClass}
+                disabled={!selectedBatch}>
+                <option value="">Select section</option>
+                {sections.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
               </select>
             </div>
           </div>
         </div>
 
-        {/* Section — Guardian Info */}
-        <div>
-          <h2 className="text-sm font-semibold text-indigo-600 uppercase
-            tracking-wider mb-4">
-            Guardian Information
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Guardian Name</label>
-              <input {...register('guardianName')} className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Guardian Phone</label>
-              <input {...register('guardianPhone')} className={inputClass} placeholder="09xxxxxxxx" />
-            </div>
-          </div>
-        </div>
-
-        {/* Buttons */}
-        <div className="flex gap-3 justify-end pt-2 border-t
-          border-gray-100 dark:border-gray-700">
-          <button
-            type="button"
-            onClick={() => navigate('/students')}
-            className="px-5 py-2.5 rounded-lg border border-gray-200
-              dark:border-gray-600 text-sm text-gray-600 dark:text-gray-300
-              hover:bg-gray-100 dark:hover:bg-gray-700"
-          >
+        {/* Submit */}
+        <div className="flex gap-3 justify-end pt-4 border-t border-gray-100
+          dark:border-gray-700">
+          <button type="button" onClick={() => navigate('/students')}
+            className="px-6 py-2.5 border-2 border-gray-200 dark:border-gray-600
+              text-sm text-gray-600 dark:text-gray-300 font-semibold rounded-xl
+              hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
             Cancel
           </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700
-              text-white text-sm font-medium rounded-lg disabled:opacity-60"
-          >
-            {isSubmitting ? 'Adding Student...' : 'Add Student'}
+          <button type="submit" disabled={isSubmitting}
+            className="flex items-center gap-2 px-7 py-2.5 bg-gradient-to-r
+              from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700
+              text-white text-sm font-bold rounded-xl shadow-lg disabled:opacity-60
+              transition-all">
+            {isSubmitting
+              ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</>
+              : <><MdSave size={18} /> {isEdit ? 'Update Student' : 'Create Student'}</>}
           </button>
         </div>
       </form>
     </div>
   );
 }
-
-export default StudentForm;

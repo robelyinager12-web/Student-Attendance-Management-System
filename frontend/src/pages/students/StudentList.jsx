@@ -153,27 +153,31 @@ export default function StudentList() {
     }
   };
 
-  const handleExport = async () => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      const params = new URLSearchParams();
-      Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
-      params.set('format', 'excel');
-      const res = await fetch(
-        `http://localhost:5000/api/reports/students?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!res.ok) { toast.error('Export failed'); return; }
-      const blob = await res.blob();
-      const url  = window.URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
-      a.download = 'students.xlsx';
-      a.click();
-      window.URL.revokeObjectURL(url);
-      toast.success('Exported successfully');
-    } catch { toast.error('Export failed'); }
-  };
+const handleExport = async () => {
+  try {
+    const token = localStorage.getItem('accessToken');
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
+
+    const res = await fetch(
+      `http://localhost:5000/api/students/export?${params}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    if (!res.ok) { toast.error('Export failed'); return; }
+
+    const blob = await res.blob();
+    const url  = window.URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'students.xlsx';
+    a.click();
+    window.URL.revokeObjectURL(url);
+    toast.success('Students exported successfully');
+  } catch {
+    toast.error('Export failed');
+  }
+};
 
   const toggleSelect = id =>
     setSelected(prev =>
@@ -208,29 +212,7 @@ export default function StudentList() {
             {filters.departmentId && departments.find(d => d.id === filters.departmentId)
               ? ` in ${departments.find(d => d.id === filters.departmentId)?.name}`
               : ''}
-          </p>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={() => navigate('/students/import')}
-            className="flex items-center gap-2 px-4 py-2.5 border-2 border-indigo-600
-              text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20
-              text-sm font-semibold rounded-xl transition-colors">
-            <MdUpload size={18} /> Import Students
-          </button>
-          <button onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2.5 border-2 border-emerald-600
-              text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20
-              text-sm font-semibold rounded-xl transition-colors">
-            <MdDownload size={18} /> Export Excel
-          </button>
-          <button onClick={() => navigate('/students/new')}
-            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600
-              hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl
-              shadow-md shadow-indigo-200 dark:shadow-none transition-colors">
-            <MdAdd size={18} /> Add Student
-          </button>
+</p>
         </div>
       </div>
 
@@ -683,35 +665,32 @@ export default function StudentList() {
                         </span>
                       </td>
 
-                      {/* Actions */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={() => navigate(`/students/${student.id}`)}
-                            title="View Profile"
-                            className="p-1.5 rounded-lg text-blue-600
-                              hover:bg-blue-50 dark:hover:bg-blue-900/20
-                              transition-colors">
-                            <MdVisibility size={17} />
-                          </button>
-                          <button
-                            onClick={() => navigate(`/students/${student.id}/edit`)}
-                            title="Edit"
-                            className="p-1.5 rounded-lg text-indigo-600
-                              hover:bg-indigo-50 dark:hover:bg-indigo-900/20
-                              transition-colors">
-                            <MdEdit size={17} />
-                          </button>
-                          <button
-                            onClick={() => setDeleteId(student.id)}
-                            title="Delete"
-                            className="p-1.5 rounded-lg text-red-500
-                              hover:bg-red-50 dark:hover:bg-red-900/20
-                              transition-colors">
-                            <MdDelete size={17} />
-                          </button>
-                        </div>
-                      </td>
+                     {/* Actions */}
+<td className="px-4 py-3">
+  <div className="flex items-center justify-center gap-1.5">
+    <button
+      onClick={() => navigate(`/students/${student.id}`)}
+      title="View Profile"
+      className="p-1.5 rounded-lg text-blue-600
+        hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+      <MdVisibility size={17} />
+    </button>
+    <button
+      onClick={() => navigate(`/students/${student.id}/edit`)}
+      title="Edit Student"
+      className="p-1.5 rounded-lg text-indigo-600
+        hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
+      <MdEdit size={17} />
+    </button>
+    <button
+      onClick={() => setDeleteId(student.id)}
+      title="Delete Student"
+      className="p-1.5 rounded-lg text-red-500
+        hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+      <MdDelete size={17} />
+    </button>
+  </div>
+</td>
                     </tr>
                   );
                 })}

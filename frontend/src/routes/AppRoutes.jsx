@@ -2,6 +2,9 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import Register from '../pages/auth/Register';
+// Add these imports at the top
+import StudentProfile from '../pages/students/StudentProfile';
+import StudentForm    from '../pages/students/StudentForm';
 
 import AuthLayout from '../layouts/AuthLayout';
 import DashboardLayout from '../layouts/DashboardLayout';
@@ -87,23 +90,32 @@ function AppRoutes() {
         <Route path="/dashboard/teacher" element={<Navigate to="/home" replace />} />
         <Route path="/dashboard/student" element={<Navigate to="/home" replace />} />
 
-        {/* Students */}
-        <Route path="/students" element={
-          <ProtectedRoute allowedRoles={['ADMIN', 'TEACHER']}>
-            <StudentList />
-          </ProtectedRoute>
-        } />
-        <Route path="/students/new" element={
-          <ProtectedRoute allowedRoles={['ADMIN']}>
-            <StudentForm />
-          </ProtectedRoute>
-        } />
-        <Route path="/students/import" element={
-          <ProtectedRoute allowedRoles={['ADMIN']}>
-            <ImportStudents />
-          </ProtectedRoute>
-        } />
-        <Route path="/students/:id" element={<StudentProfile />} />
+       {/* ── Students ── */}
+<Route path="/students" element={
+  <ProtectedRoute allowedRoles={['ADMIN','TEACHER']}>
+    <StudentList />
+  </ProtectedRoute>
+} />
+<Route path="/students/new" element={
+  <ProtectedRoute allowedRoles={['ADMIN']}>
+    <StudentForm />
+  </ProtectedRoute>
+} />
+<Route path="/students/import" element={
+  <ProtectedRoute allowedRoles={['ADMIN']}>
+    <ImportStudents />
+  </ProtectedRoute>
+} />
+<Route path="/students/:id/edit" element={
+  <ProtectedRoute allowedRoles={['ADMIN']}>
+    <StudentForm />
+  </ProtectedRoute>
+} />
+<Route path="/students/:id" element={
+  <ProtectedRoute allowedRoles={['ADMIN','TEACHER']}>
+    <StudentProfile />
+  </ProtectedRoute>
+} />
 
         {/* Teachers */}
         <Route path="/teachers" element={
