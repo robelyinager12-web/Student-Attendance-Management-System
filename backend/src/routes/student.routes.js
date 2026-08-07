@@ -2,12 +2,15 @@ const express = require('express');
 const router = express.Router();
 
 const {
-  createStudent,
   getStudents,
   getStudentById,
+  createStudent,
   updateStudent,
   deleteStudent,
+  getMyProfile,
+  getStudentsBySection,
   uploadStudentPhoto,
+  exportStudents,
 } = require('../controllers/student.controller');
 
 const authMiddleware = require('../middlewares/auth.middleware');
@@ -23,6 +26,7 @@ router.use(authMiddleware);
 
 router.post('/', authorize('ADMIN'), createStudentValidator, validate, createStudent);
 router.get('/', authorize('ADMIN', 'TEACHER'), getStudents); // ?page=&limit=&search=&departmentId=&courseId=&classId=&status=
+router.get('/export', authorize('ADMIN'), exportStudents);
 router.get('/:id', getStudentById); // student can view their own profile
 router.put('/:id', authorize('ADMIN'), updateStudentValidator, validate, updateStudent);
 router.delete('/:id', authorize('ADMIN'), deleteStudent);

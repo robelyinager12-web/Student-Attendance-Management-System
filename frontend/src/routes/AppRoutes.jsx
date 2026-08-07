@@ -2,9 +2,6 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import Register from '../pages/auth/Register';
-// Add these imports at the top
-import StudentProfile from '../pages/students/StudentProfile';
-import StudentForm    from '../pages/students/StudentForm';
 
 import AuthLayout from '../layouts/AuthLayout';
 import DashboardLayout from '../layouts/DashboardLayout';

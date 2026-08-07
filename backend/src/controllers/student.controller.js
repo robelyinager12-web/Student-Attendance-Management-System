@@ -1,83 +1,13 @@
-const { createNotification } = require('../services/notification.service');
-const { User: UserModel } = require('../models'); // already imported as User above, skip if duplicate
-const bcrypt = require('bcrypt');
-const { Op } = require('sequelize');
-const asyncHandler = require('../utils/asyncHandler');
-const { success, error } = require('../utils/apiResponse');
-const { getPagination, buildPaginatedResponse } = require('../utils/pagination.utils');
 const {
   Student, User, Department, Program,
   Batch, AcademicYear, Semester, Section,
   Course, Class, Attendance,
 } = require('../models');
-const asyncHandler  = require('../middlewares/asyncHandler.middleware');
-const { success, error } = require('../utils/response.util');
-const auditLog      = require('../services/auditLog.service');
+const asyncHandler = require('../utils/asyncHandler');
+const { success, error } = require('../utils/apiResponse');
+const auditLog = require('../services/auditLog.service');
 
-async function generateStudentCode() {
-  const count = await Student.count();
-  return `STU-${String(count + 1).padStart(4, '0')}`;
-}
-
-const createStudent = asyncHandler(async (req, res) => {
-  const {
-    name, email, password, gender, dateOfBirth, phone, address,
-    departmentId, courseId, classId, year, semester,
-    guardianName, guardianPhone, admissionDate,
-  } = req.body;
-
-  const existingUser = await User.findOne({ where: { email } });
-  if (existingUser) {
-    return error(res, 409, 'Email already in use');
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const user = await User.create({ name, email, password: hashedPassword, role: 'STUDENT' });
-
-  const studentCode = await generateStudentCode();
-
-  const student = await Student.create({
-    userId: user.id,
-    studentCode,
-    gender,
-    dateOfBirth,
-    phone,
-    address,
-    departmentId,
-    courseId,
-    classId,
-    year,
-    semester,
-    guardianName,
-    guardianPhone,
-    admissionDate,
-  });
-
-  // Auto-enroll in the course if provided
-  if (courseId) {
-    await Enrollment.create({ studentId: student.id, courseId });
-  }
-  // Notify all admins about the new student
-  const admins = await User.findAll({ where: { role: 'ADMIN' } });
-  await Promise.all(
-    admins.map((admin) =>
-      createNotification({
-        userId: admin.id,
-        title: 'New Student Added',
-        message: `${user.name} (${studentCode}) was just registered as a new student.`,
-        type: 'STUDENT',
-      })
-    )
-  );
-
-  return success(res, 201, 'Student created successfully', {
-    id: student.id,
-    studentCode: student.studentCode,
-    name: user.name,
-    email: user.email,
-  });
-});
-
+// ── GET all students ─────────────────────────────────────────────────────────
 const getStudents = asyncHandler(async (req, res) => {
   const {
     search, departmentId, sectionId, batchId,
@@ -88,175 +18,281 @@ const getStudents = asyncHandler(async (req, res) => {
 
   const { Op } = require('sequelize');
 
-  // ── Student-level filters ──────────────────────────────────────────────────
   const studentWhere = {};
-  if (departmentId)   studentWhere.departmentId   = departmentId;
-  if (sectionId)      studentWhere.sectionId      = sectionId;
-  if (batchId)        studentWhere.batchId        = batchId;
+  if (departmentId) studentWhere.departmentId = departmentId;
+  if (sectionId) studentWhere.sectionId = sectionId;
+  if (batchId) studentWhere.batchId = batchId;
   if (academicYearId) studentWhere.academicYearId = academicYearId;
-  if (semesterId)     studentWhere.semesterId     = semesterId;
-  if (courseId)       studentWhere.courseId       = courseId;
-  if (classId)        studentWhere.classId        = classId;
-  if (year)           studentWhere.year           = parseInt(year);
-  if (status)         studentWhere.status         = status.toUpperCase();
-
-  // Search on studentCode directly
+  if (semesterId) studentWhere.semesterId = semesterId;
+  if (courseId) studentWhere.courseId = courseId;
+  if (classId) studentWhere.classId = classId;
+  if (year) studentWhere.year = parseInt(year);
+  if (status) studentWhere.status = status.toUpperCase();
   if (search) {
     studentWhere[Op.or] = [
       { studentCode: { [Op.iLike]: `%${search}%` } },
-    ];
-  }
-
-  // ── User-level filters ─────────────────────────────────────────────────────
-  const userWhere = {};
-  if (search) {
-    userWhere[Op.or] = [
-      { name:  { [Op.iLike]: `%${search}%` } },
-      { email: { [Op.iLike]: `%${search}%` } },
+      { '$User.name$': { [Op.iLike]: `%${search}%` } },
+      { '$User.email$': { [Op.iLike]: `%${search}%` } },
     ];
   }
 
   const offset = (parseInt(page) - 1) * parseInt(limit);
 
-  // ── Build includes ─────────────────────────────────────────────────────────
-  // User is required — every student has a user account
-  const userInclude = {
-    model:      User,
-    attributes: ['id', 'name', 'email', 'phone'],
-    required:   true,
-  };
-
-  // If searching by name/email, add where to user include
-  if (Object.keys(userWhere).length > 0) {
-    // Merge student code OR with user OR
-    if (search) {
-      // Use a top-level OR combining studentCode and user name/email
-      studentWhere[Op.or] = [
-        { studentCode: { [Op.iLike]: `%${search}%` } },
-        { '$User.name$':  { [Op.iLike]: `%${search}%` } },
-        { '$User.email$': { [Op.iLike]: `%${search}%` } },
-      ];
-    }
-  }
-
   try {
     const { count, rows } = await Student.findAndCountAll({
-      where:   studentWhere,
+      where: studentWhere,
       include: [
         {
-          model:      User,
-          attributes: ['id', 'name', 'email', 'phone'],
-          required:   true,
+          model: User,
+          // ✅ ONLY columns that actually exist on users table
+          attributes: ['id', 'name', 'email'],
+          required: true,
         },
         {
-          model:      Department,
+          model: Department,
           attributes: ['id', 'name', 'code'],
-          required:   false,
+          required: false,
         },
         {
-          model:      Program,
+          model: Program,
           attributes: ['id', 'name', 'code'],
-          required:   false,
+          required: false,
         },
         {
-          model:      Batch,
+          model: Batch,
           attributes: ['id', 'name', 'year'],
-          required:   false,
+          required: false,
         },
         {
-          model:      AcademicYear,
-          attributes: ['id', 'name', 'year'],
-          required:   false,
-        },
-        {
-          model:      Semester,
-          attributes: ['id', 'name', 'number'],
-          required:   false,
-        },
-        {
-          model:      Section,
+          model: AcademicYear,
           attributes: ['id', 'name'],
-          required:   false,
+          required: false,
+        },
+        {
+          model: Semester,
+          attributes: ['id', 'name'],
+          required: false,
+        },
+        {
+          model: Section,
+          attributes: ['id', 'name'],
+          required: false,
         },
       ],
-      order:    [[User, 'name', 'ASC']],
-      limit:    parseInt(limit),
+      order: [[User, 'name', 'ASC']],
+      limit: parseInt(limit),
       offset,
       distinct: true,
-      subQuery: false,   // ← critical: prevents count issues with search
+      subQuery: false,
     });
 
     return success(res, 200, 'Students fetched successfully', {
-      items:      rows,
-      total:      count,
-      page:       parseInt(page),
+      items: rows,
+      total: count,
+      page: parseInt(page),
       totalPages: Math.ceil(count / parseInt(limit)),
     });
 
   } catch (err) {
-    console.error('getStudents DB error:', err.message);
-    console.error(err.stack);
-    return error(res, 500, `Failed to fetch students: ${err.message}`);
+    console.error('getStudents error:', err.message);
+    return error(res, 500, 'Failed to fetch students: ' + err.message);
   }
 });
 
+// ── GET single student ───────────────────────────────────────────────────────
 const getStudentById = asyncHandler(async (req, res) => {
   const { id } = req.params;
-
-  const student = await Student.findByPk(id, {
-    include: [
-      { model: User, attributes: ['id', 'name', 'email', 'profileImage', 'isActive'] },
-      { model: Department, attributes: ['id', 'name', 'code'] },
-      { model: Course, attributes: ['id', 'name', 'code'] },
-      { model: Class, attributes: ['id', 'name', 'section'] },
-      { model: Attendance, limit: 10, order: [['date', 'DESC']] },
-    ],
-  });
-
-  if (!student) {
-    return error(res, 404, 'Student not found');
+  try {
+    const student = await Student.findByPk(id, {
+      include: [
+        { model: User,        attributes: ['id', 'name', 'email'], required: false },
+        { model: Department,  attributes: ['id', 'name', 'code'], required: false },
+        { model: Program,     attributes: ['id', 'name', 'code'], required: false },
+        { model: Batch,       attributes: ['id', 'name', 'year'], required: false },
+        { model: AcademicYear,attributes: ['id', 'name'],         required: false },
+        { model: Semester,    attributes: ['id', 'name'],         required: false },
+        { model: Section,     attributes: ['id', 'name'],         required: false },
+      ],
+    });
+    if (!student) return error(res, 404, 'Student not found');
+    return success(res, 200, 'Student fetched successfully', student);
+  } catch (err) {
+    console.error('getStudentById error:', err.message);
+    return error(res, 500, 'Failed to fetch student: ' + err.message);
   }
-
-  return success(res, 200, 'Student fetched successfully', student);
 });
 
+// ── CREATE student ───────────────────────────────────────────────────────────
+const createStudent = asyncHandler(async (req, res) => {
+  const {
+    userId, studentCode, departmentId, programId,
+    batchId, academicYearId, semesterId, sectionId,
+    courseId, classId, gender, year, status,
+  } = req.body;
+
+  if (!userId) return error(res, 400, 'userId is required');
+
+  try {
+    const exists = await Student.findOne({ where: { userId } });
+    if (exists) return error(res, 409, 'Student profile already exists for this user');
+
+    const student = await Student.create({
+      userId,
+      studentCode: studentCode || null,
+      departmentId: departmentId || null,
+      programId: programId || null,
+      batchId: batchId || null,
+      academicYearId: academicYearId || null,
+      semesterId: semesterId || null,
+      sectionId: sectionId || null,
+      courseId: courseId || null,
+      classId: classId || null,
+      gender: gender || null,
+      year: year ? parseInt(year) : null,
+      status: status || 'ACTIVE',
+    });
+
+    await auditLog.log({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      action: 'CREATE',
+      entity: 'Student',
+      entityId: student.id,
+      newValues: student.toJSON(),
+      description: `Created student: ${studentCode}`,
+      req,
+    });
+
+    return success(res, 201, 'Student created successfully', student);
+  } catch (err) {
+    console.error('createStudent error:', err.message);
+    return error(res, 500, 'Failed to create student: ' + err.message);
+  }
+});
+
+// ── UPDATE student ───────────────────────────────────────────────────────────
 const updateStudent = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const student = await Student.findByPk(id);
+  const {
+    studentCode, departmentId, programId,
+    batchId, academicYearId, semesterId, sectionId,
+    courseId, classId, gender, year, status,
+  } = req.body;
 
-  if (!student) {
-    return error(res, 404, 'Student not found');
-  }
+  try {
+    const student = await Student.findByPk(id);
+    if (!student) return error(res, 404, 'Student not found');
 
-  await student.update(req.body);
-
-  // If course changed, ensure enrollment exists
-  if (req.body.courseId) {
-    const existingEnrollment = await Enrollment.findOne({
-      where: { studentId: student.id, courseId: req.body.courseId },
+    const old = student.toJSON();
+    await student.update({
+      ...(studentCode !== undefined && { studentCode }),
+      ...(departmentId !== undefined && { departmentId }),
+      ...(programId !== undefined && { programId }),
+      ...(batchId !== undefined && { batchId }),
+      ...(academicYearId !== undefined && { academicYearId }),
+      ...(semesterId !== undefined && { semesterId }),
+      ...(sectionId !== undefined && { sectionId }),
+      ...(courseId !== undefined && { courseId }),
+      ...(classId !== undefined && { classId }),
+      ...(gender !== undefined && { gender }),
+      ...(year !== undefined && { year: parseInt(year) }),
+      ...(status !== undefined && { status }),
     });
-    if (!existingEnrollment) {
-      await Enrollment.create({ studentId: student.id, courseId: req.body.courseId });
-    }
-  }
 
-  return success(res, 200, 'Student updated successfully', student);
+    await auditLog.log({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      action: 'UPDATE',
+      entity: 'Student',
+      entityId: student.id,
+      oldValues: old,
+      newValues: student.toJSON(),
+      description: `Updated student: ${student.studentCode}`,
+      req,
+    });
+
+    return success(res, 200, 'Student updated successfully', student);
+  } catch (err) {
+    console.error('updateStudent error:', err.message);
+    return error(res, 500, 'Failed to update student: ' + err.message);
+  }
 });
 
+// ── DELETE student ───────────────────────────────────────────────────────────
 const deleteStudent = asyncHandler(async (req, res) => {
   const { id } = req.params;
+  try {
+    const student = await Student.findByPk(id);
+    if (!student) return error(res, 404, 'Student not found');
 
-  const student = await Student.findByPk(id);
-  if (!student) {
-    return error(res, 404, 'Student not found');
+    await auditLog.log({
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      action: 'DELETE',
+      entity: 'Student',
+      entityId: student.id,
+      oldValues: student.toJSON(),
+      description: `Deleted student: ${student.studentCode}`,
+      req,
+    });
+
+    await student.destroy();
+    return success(res, 200, 'Student deleted successfully');
+  } catch (err) {
+    console.error('deleteStudent error:', err.message);
+    return error(res, 500, 'Failed to delete student: ' + err.message);
   }
-
-  await User.destroy({ where: { id: student.userId } });
-  await student.destroy();
-
-  return success(res, 200, 'Student deleted successfully');
 });
 
+// ── GET student's own profile (for STUDENT role) ─────────────────────────────
+const getMyProfile = asyncHandler(async (req, res) => {
+  try {
+    const student = await Student.findOne({
+      where: { userId: req.user.id },
+      include: [
+        { model: User, attributes: ['id', 'name', 'email'], required: false },
+        { model: Department, attributes: ['id', 'name', 'code'], required: false },
+        { model: Program, attributes: ['id', 'name', 'code'], required: false },
+        { model: Batch, attributes: ['id', 'name', 'year'], required: false },
+        { model: AcademicYear, attributes: ['id', 'name'], required: false },
+        { model: Semester, attributes: ['id', 'name'], required: false },
+        { model: Section, attributes: ['id', 'name'], required: false },
+      ],
+    });
+    if (!student) return error(res, 404, 'Student profile not found');
+    return success(res, 200, 'Profile fetched successfully', student);
+  } catch (err) {
+    console.error('getMyProfile error:', err.message);
+    return error(res, 500, 'Failed to fetch profile: ' + err.message);
+  }
+});
+
+// ── GET attendance for section check (used in TakeAttendance) ───────────────
+const getStudentsBySection = asyncHandler(async (req, res) => {
+  const { courseId, sectionId, batchId } = req.query;
+  const where = { status: 'ACTIVE' };
+  if (sectionId) where.sectionId = sectionId;
+  if (batchId) where.batchId = batchId;
+
+  try {
+    const students = await Student.findAll({
+      where,
+      include: [
+        { model: User, attributes: ['id', 'name', 'email'], required: true },
+        { model: Section, attributes: ['id', 'name'], required: false },
+        { model: Batch, attributes: ['id', 'name'], required: false },
+        { model: Department, attributes: ['id', 'name'], required: false },
+      ],
+      order: [[User, 'name', 'ASC']],
+    });
+    return success(res, 200, 'Students fetched successfully', students);
+  } catch (err) {
+    console.error('getStudentsBySection error:', err.message);
+    return error(res, 500, 'Failed to fetch students: ' + err.message);
+  }
+});
+
+// ── Upload student profile photo ────────────────────────────────────────────
 const uploadStudentPhoto = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -274,12 +310,71 @@ const uploadStudentPhoto = asyncHandler(async (req, res) => {
 
   return success(res, 200, 'Profile image uploaded successfully', { profileImage: imagePath });
 });
+const exportStudents = asyncHandler(async (req, res) => {
+  const { Op } = require('sequelize');
+  const XLSX = require('xlsx');
+  const { departmentId, sectionId, batchId, status, search } = req.query;
+
+  const where = {};
+  if (departmentId) where.departmentId = departmentId;
+  if (sectionId) where.sectionId = sectionId;
+  if (batchId) where.batchId = batchId;
+  if (status) where.status = status.toUpperCase();
+  if (search) where[Op.or] = [{ studentCode: { [Op.iLike]: `%${search}%` } }];
+
+  const students = await Student.findAll({
+    where,
+    include: [
+      { model: User, attributes: ['name', 'email'], required: true },
+      { model: Department, attributes: ['name'], required: false },
+      { model: Program, attributes: ['name'], required: false },
+      { model: Batch, attributes: ['name'], required: false },
+      { model: AcademicYear, attributes: ['name'], required: false },
+      { model: Semester, attributes: ['name'], required: false },
+      { model: Section, attributes: ['name'], required: false },
+    ],
+    order: [[User, 'name', 'ASC']],
+    limit: 5000,
+  });
+
+  const rows = students.map((s, i) => ({
+    'No': i + 1,
+    'Student ID': s.studentCode || '',
+    'Full Name': s.User?.name || '',
+    'Email': s.User?.email || '',
+    'Department': s.Department?.name || '',
+    'Program': s.Program?.name || '',
+    'Batch': s.Batch?.name || '',
+    'Year': s.AcademicYear?.name || '',
+    'Semester': s.Semester?.name || '',
+    'Section': s.Section?.name || '',
+    'Status': s.status || '',
+  }));
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 5 }, { wch: 14 }, { wch: 30 }, { wch: 30 },
+    { wch: 24 }, { wch: 24 }, { wch: 12 }, { wch: 10 },
+    { wch: 12 }, { wch: 10 }, { wch: 10 },
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, 'Students');
+
+  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+  res.setHeader('Content-Disposition', 'attachment; filename="students.xlsx"');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buffer);
+});
 
 module.exports = {
-  createStudent,
   getStudents,
   getStudentById,
+  createStudent,
   updateStudent,
   deleteStudent,
+  getMyProfile,
+  getStudentsBySection,
   uploadStudentPhoto,
+  exportStudents,        // ← add this
 };
